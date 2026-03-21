@@ -527,9 +527,9 @@ export default function App() {
                     const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
                     return (
                       <div key={campo} style={{ marginBottom: 16 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
-                          <div style={{ position: "relative" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }} title={label}>{label}</span>
+                          <div style={{ position: "relative", flexShrink: 0 }}>
                             <input type="text"
                               value={inputFoco[campo] ? (inputTemp[campo] || "") : raw.toFixed(1)}
                               onFocus={() => { setInputFoco(p => ({...p, [campo]: true})); setInputTemp(p => ({...p, [campo]: String(raw)})); }}
@@ -541,8 +541,8 @@ export default function App() {
                           </div>
                         </div>
                         <input type="range" min={min} max={max} step={0.1} value={raw} onChange={e => setParametros(p => ({...p, [campo]: e.target.value}))}
-                          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }} />
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 3 }}>
+                          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4, display: "block", margin: "0" }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 4 }}>
                           <span>{min}%</span><span>{max}%</span>
                         </div>
                       </div>
@@ -577,9 +577,9 @@ export default function App() {
                     const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
                     return (
                       <div key={campo} style={{ marginBottom: 16 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
-                          <div style={{ position: "relative" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }} title={label}>{label}</span>
+                          <div style={{ position: "relative", flexShrink: 0 }}>
                             <input type="text"
                               value={inputFoco[campo] ? (inputTemp[campo] || "") : raw.toFixed(1)}
                               onFocus={() => { setInputFoco(p => ({...p, [campo]: true})); setInputTemp(p => ({...p, [campo]: String(raw)})); }}
@@ -591,8 +591,8 @@ export default function App() {
                           </div>
                         </div>
                         <input type="range" min={min} max={max} step={0.1} value={raw} onChange={e => setParametros(p => ({...p, [campo]: e.target.value}))}
-                          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }} />
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 3 }}>
+                          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4, display: "block", margin: "0" }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 4 }}>
                           <span>{min}%</span><span>{max}%</span>
                         </div>
                       </div>
@@ -660,8 +660,8 @@ export default function App() {
             );
             return (
               <GlassCard style={{ marginBottom: 20, borderLeft: `3px solid ${C.indigo}`, borderRadius: "0 16px 16px 0" }}>
-                <div style={{ fontSize: 10, color: C.indigo, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 14, fontWeight: 600 }}>Resumo Executivo</div>
-                <div style={{ fontSize: 13, color: C.slate, lineHeight: 2, fontFamily: C.sans }}>
+                <div style={{ fontSize: 11, color: C.indigo, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 14, fontWeight: 700, fontSize: 14 }}>Resumo Executivo</div>
+                <div style={{ fontSize: 15, color: C.slate, lineHeight: 2, fontFamily: C.sans }}>
                   {prazo
                     ? <>Com os parâmetros atuais, você atingirá a independência financeira em aproximadamente <D cor={C.white}>{prazo.toFixed(1).replace(".", ",")} anos</D>. </>
                     : <>A meta <D cor={C.rose}>não é atingida</D> dentro de 80 anos — considere aumentar o aporte ou reduzir a renda desejada. </>
@@ -681,7 +681,6 @@ export default function App() {
                     ? <><D cor={C.rose}>⚠ Atenção:</D> o patrimônio se esgota no ano <D cor={C.rose}>{anoEsgot}</D>. Considere reduzir a taxa de retirada.</>
                     : <>O patrimônio sustenta os <D cor={C.white}>{prazoUsu} anos</D> de usufruto{heranca > 0 ? <>, com herança projetada de <D cor={C.amber}>{fmtC(heranca)}</D>.</> : <>.</>}</>
                   }
-                  {crescAporte > 0 && <> Crescimento do aporte de <D cor={C.amber}>{(crescAporte * 100).toFixed(1).replace(".", ",")}% ao ano</D> acelera a meta.</>}
                 </div>
               </GlassCard>
             );
