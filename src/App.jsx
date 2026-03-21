@@ -452,29 +452,152 @@ export default function App() {
 
           {/* Campos */}
           <div ref={sidebarRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
-            <AccordionSection title="Fase de Acumulação" icon="📈" open={accOpen} onToggle={() => setAccOpen(!accOpen)}>
-              <MoneyField label="Patrimônio Inicial" campo="patrimonioInicial" />
-              <MoneyField label="Aporte Mensal" campo="aporteMensal" />
-              <MoneyField label="Renda Mensal Desejada (meta)" campo="rendaMensalDesejada" />
-              <SliderField label="Crescimento do Aporte" campo="crescimentoAporteAnual" min={0} max={20} step={0.5} />
-              <SliderField label="Retorno Nominal (Acumulação)" campo="retornoNominalAcumulacao" min={0} max={30} step={0.5} />
-              <SliderField label="Inflação" campo="inflacao" min={0} max={20} step={0.5} />
-              <IntField label="Prazo de Acumulação" campo="prazoAcumulacao" suffix="anos" />
-            </AccordionSection>
 
-            <AccordionSection title="Fase de Usufruto" icon="🌅" open={usuOpen} onToggle={() => setUsuOpen(!usuOpen)}>
-              <SliderField label="Retorno Nominal (Usufruto)" campo="retornoNominalUsufruto" min={0} max={25} step={0.5} />
-              <SliderField label="Taxa de Retirada Anual" campo="taxaRetiradaAnual" min={1} max={10} step={0.25} />
-              <IntField label="Prazo de Usufruto" campo="prazoUsufruto" suffix="anos" />
-              <div style={{ marginBottom: 14 }}>
-                <span style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Modo de Usufruto<InfoIcon campo="modoUsufruto" /></span>
-                <select value={parametros.modoUsufruto} onChange={e => setP("modoUsufruto", e.target.value)}
-                  style={{ width: "100%", padding: "8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 12, fontFamily: C.sans, outline: "none" }}>
-                  <option value="fixa">Renda fixa real</option>
-                  <option value="variavel">Retirada percentual</option>
-                </select>
-              </div>
-            </AccordionSection>
+            {/* ── ACUMULAÇÃO ── */}
+            <div style={{ marginBottom: 8, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <button onClick={() => setAccOpen(!accOpen)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: accOpen ? C.surface2 : "transparent", border: "none", cursor: "pointer", color: C.white2, fontFamily: C.sans, fontSize: 13, fontWeight: 500 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}><span>📈</span>Fase de Acumulação</span>
+                <span style={{ color: C.slate, fontSize: 10, transform: accOpen ? "rotate(180deg)" : "none" }}>▼</span>
+              </button>
+              {accOpen && (
+                <div style={{ padding: "14px 14px 4px", background: "rgba(15,23,42,0.3)" }}>
+                  {/* Patrimônio Inicial */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Patrimônio Inicial</label>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, pointerEvents: "none" }}>R$</span>
+                      <input type="text" value={inputFoco["patrimonioInicial"] ? (inputTemp["patrimonioInicial"] || "") : (parametros.patrimonioInicial || "")}
+                        onFocus={() => { setInputFoco(p => ({...p, patrimonioInicial: true})); setInputTemp(p => ({...p, patrimonioInicial: String(limparMoeda(parametros.patrimonioInicial) || "")})); }}
+                        onBlur={() => { setInputFoco(p => ({...p, patrimonioInicial: false})); const n = parseFloat((inputTemp["patrimonioInicial"]||"0").replace(",","."))||0; setParametros(p => ({...p, patrimonioInicial: n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})})); }}
+                        onChange={e => setInputTemp(p => ({...p, patrimonioInicial: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                        style={{ width:"100%", paddingLeft:30, paddingRight:10, paddingTop:8, paddingBottom:8, background:C.surface2, border:`1px solid ${inputFoco["patrimonioInicial"]?C.indigo:C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box" }} />
+                    </div>
+                  </div>
+                  {/* Aporte Mensal */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Aporte Mensal</label>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, pointerEvents: "none" }}>R$</span>
+                      <input type="text" value={inputFoco["aporteMensal"] ? (inputTemp["aporteMensal"] || "") : (parametros.aporteMensal || "")}
+                        onFocus={() => { setInputFoco(p => ({...p, aporteMensal: true})); setInputTemp(p => ({...p, aporteMensal: String(limparMoeda(parametros.aporteMensal) || "")})); }}
+                        onBlur={() => { setInputFoco(p => ({...p, aporteMensal: false})); const n = parseFloat((inputTemp["aporteMensal"]||"0").replace(",","."))||0; setParametros(p => ({...p, aporteMensal: n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})})); }}
+                        onChange={e => setInputTemp(p => ({...p, aporteMensal: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                        style={{ width:"100%", paddingLeft:30, paddingRight:10, paddingTop:8, paddingBottom:8, background:C.surface2, border:`1px solid ${inputFoco["aporteMensal"]?C.indigo:C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box" }} />
+                    </div>
+                  </div>
+                  {/* Renda Mensal Desejada */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Renda Mensal Desejada (meta)</label>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, pointerEvents: "none" }}>R$</span>
+                      <input type="text" value={inputFoco["rendaMensalDesejada"] ? (inputTemp["rendaMensalDesejada"] || "") : (parametros.rendaMensalDesejada || "")}
+                        onFocus={() => { setInputFoco(p => ({...p, rendaMensalDesejada: true})); setInputTemp(p => ({...p, rendaMensalDesejada: String(limparMoeda(parametros.rendaMensalDesejada) || "")})); }}
+                        onBlur={() => { setInputFoco(p => ({...p, rendaMensalDesejada: false})); const n = parseFloat((inputTemp["rendaMensalDesejada"]||"0").replace(",","."))||0; setParametros(p => ({...p, rendaMensalDesejada: n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})})); }}
+                        onChange={e => setInputTemp(p => ({...p, rendaMensalDesejada: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                        style={{ width:"100%", paddingLeft:30, paddingRight:10, paddingTop:8, paddingBottom:8, background:C.surface2, border:`1px solid ${inputFoco["rendaMensalDesejada"]?C.indigo:C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box" }} />
+                    </div>
+                  </div>
+                  {/* Sliders acumulação */}
+                  {[
+                    { label: "Crescimento do Aporte", campo: "crescimentoAporteAnual", min: 0, max: 20 },
+                    { label: "Retorno Nominal (Acumulação)", campo: "retornoNominalAcumulacao", min: 0, max: 30 },
+                    { label: "Inflação", campo: "inflacao", min: 0, max: 20 },
+                  ].map(({ label, campo, min, max }) => {
+                    const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
+                    return (
+                      <div key={campo} style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
+                          <div style={{ position: "relative" }}>
+                            <input type="text"
+                              value={inputFoco[campo] ? (inputTemp[campo] || "") : raw.toFixed(1)}
+                              onFocus={() => { setInputFoco(p => ({...p, [campo]: true})); setInputTemp(p => ({...p, [campo]: String(raw)})); }}
+                              onBlur={() => { setInputFoco(p => ({...p, [campo]: false})); const n = parseFloat((inputTemp[campo]||"0").replace(",",".")); if (!isNaN(n)) setParametros(p => ({...p, [campo]: String(Math.min(max, Math.max(min, n)))})); }}
+                              onChange={e => setInputTemp(p => ({...p, [campo]: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                              style={{ width: 72, textAlign: "right", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${inputFoco[campo] ? C.indigo : C.border}`, borderRadius: 6, padding: "3px 22px 3px 8px", outline: "none" }}
+                            />
+                            <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
+                          </div>
+                        </div>
+                        <input type="range" min={min} max={max} step={0.1} value={raw} onChange={e => setParametros(p => ({...p, [campo]: e.target.value}))}
+                          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 3 }}>
+                          <span>{min}%</span><span>{max}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Prazo acumulação */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Prazo de Acumulação</label>
+                    <div style={{ position: "relative" }}>
+                      <input type="number" value={parametros.prazoAcumulacao} onChange={e => setParametros(p => ({...p, prazoAcumulacao: e.target.value}))} min={1} max={60}
+                        style={{ width:"100%", padding:"8px 40px 8px 10px", background:C.surface2, border:`1px solid ${C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box", WebkitAppearance:"none", MozAppearance:"textfield" }} />
+                      <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:11, color:C.slate, pointerEvents:"none" }}>anos</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── USUFRUTO ── */}
+            <div style={{ marginBottom: 8, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <button onClick={() => setUsuOpen(!usuOpen)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: usuOpen ? C.surface2 : "transparent", border: "none", cursor: "pointer", color: C.white2, fontFamily: C.sans, fontSize: 13, fontWeight: 500 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}><span>🌅</span>Fase de Usufruto</span>
+                <span style={{ color: C.slate, fontSize: 10, transform: usuOpen ? "rotate(180deg)" : "none" }}>▼</span>
+              </button>
+              {usuOpen && (
+                <div style={{ padding: "14px 14px 4px", background: "rgba(15,23,42,0.3)" }}>
+                  {/* Sliders usufruto */}
+                  {[
+                    { label: "Retorno Nominal (Usufruto)", campo: "retornoNominalUsufruto", min: 0, max: 25 },
+                    { label: "Taxa de Retirada Anual", campo: "taxaRetiradaAnual", min: 1, max: 10 },
+                  ].map(({ label, campo, min, max }) => {
+                    const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
+                    return (
+                      <div key={campo} style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
+                          <div style={{ position: "relative" }}>
+                            <input type="text"
+                              value={inputFoco[campo] ? (inputTemp[campo] || "") : raw.toFixed(1)}
+                              onFocus={() => { setInputFoco(p => ({...p, [campo]: true})); setInputTemp(p => ({...p, [campo]: String(raw)})); }}
+                              onBlur={() => { setInputFoco(p => ({...p, [campo]: false})); const n = parseFloat((inputTemp[campo]||"0").replace(",",".")); if (!isNaN(n)) setParametros(p => ({...p, [campo]: String(Math.min(max, Math.max(min, n)))})); }}
+                              onChange={e => setInputTemp(p => ({...p, [campo]: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                              style={{ width: 72, textAlign: "right", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${inputFoco[campo] ? C.indigo : C.border}`, borderRadius: 6, padding: "3px 22px 3px 8px", outline: "none" }}
+                            />
+                            <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
+                          </div>
+                        </div>
+                        <input type="range" min={min} max={max} step={0.1} value={raw} onChange={e => setParametros(p => ({...p, [campo]: e.target.value}))}
+                          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 3 }}>
+                          <span>{min}%</span><span>{max}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Prazo usufruto */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Prazo de Usufruto</label>
+                    <div style={{ position: "relative" }}>
+                      <input type="number" value={parametros.prazoUsufruto} onChange={e => setParametros(p => ({...p, prazoUsufruto: e.target.value}))} min={1} max={60}
+                        style={{ width:"100%", padding:"8px 40px 8px 10px", background:C.surface2, border:`1px solid ${C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box", WebkitAppearance:"none", MozAppearance:"textfield" }} />
+                      <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:11, color:C.slate, pointerEvents:"none" }}>anos</span>
+                    </div>
+                  </div>
+                  {/* Modo usufruto */}
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Modo de Usufruto</span>
+                    <select value={parametros.modoUsufruto} onChange={e => setParametros(p => ({...p, modoUsufruto: e.target.value}))}
+                      style={{ width: "100%", padding: "8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 12, fontFamily: C.sans, outline: "none" }}>
+                      <option value="fixa">Renda fixa real</option>
+                      <option value="variavel">Retirada percentual</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Footer sidebar */}
