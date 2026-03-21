@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AreaChart, Area, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceDot } from "recharts";
 
 function calcularSimulacao(parametros) {
@@ -112,10 +112,39 @@ export default function App() {
   const [usuOpen, setUsuOpen] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState("graficos");
   const [tooltipAtivo, setTooltipAtivo] = useState(null);
+  const sidebarRef = useRef(null);
 
   useEffect(() => {
     try { localStorage.setItem("pf-v2", JSON.stringify(parametros)); } catch {}
   }, [parametros]);
+
+  // Preserva posição do scroll da sidebar ao fazer re-render
+  const focarCampo = useCallback((campo, valorAtual) => {
+    const scrollTop = sidebarRef.current?.scrollTop ?? 0;
+    setInputFoco(prev => ({ ...prev, [campo]: true }));
+    setInputTemp(prev => ({ ...prev, [campo]: String(valorAtual) }));
+    requestAnimationFrame(() => {
+      if (sidebarRef.current) sidebarRef.current.scrollTop = scrollTop;
+    });
+  }, []);
+
+  const sairCampoMoeda = useCallback((campo) => {
+    setInputFoco(prev => ({ ...prev, [campo]: false }));
+    setInputTemp(prev => {
+      const num = parseFloat((prev[campo] || "0").replace(",", ".")) || 0;
+      setParametros(p => ({ ...p, [campo]: num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
+      return prev;
+    });
+  }, []);
+
+  const sairCampoSlider = useCallback((campo, min, max) => {
+    setInputFoco(prev => ({ ...prev, [campo]: false }));
+    setInputTemp(prev => {
+      const num = parseFloat((prev[campo] || "0").replace(",", "."));
+      if (!isNaN(num)) setParametros(p => ({ ...p, [campo]: String(Math.min(max, Math.max(min, num))) }));
+      return prev;
+    });
+  }, []);
 
   const limparMoeda      = v => !v ? 0 : Number(v.replace(/\./g, "").replace(",", ".")) || 0;
   const limparInteiro    = v => Number(v.replace(/\D/g, "")) || 0;
@@ -232,23 +261,6 @@ export default function App() {
   // Estado elevado para inputs — evita re-renders ao hover
   const [inputFoco, setInputFoco] = useState({});
   const [inputTemp, setInputTemp] = useState({});
-
-  const focarCampo = (campo, valorAtual) => {
-    setInputFoco(prev => ({ ...prev, [campo]: true }));
-    setInputTemp(prev => ({ ...prev, [campo]: String(valorAtual).replace(/\./g, "").replace(",", ".") }));
-  };
-
-  const sairCampoMoeda = (campo) => {
-    setInputFoco(prev => ({ ...prev, [campo]: false }));
-    const num = parseFloat((inputTemp[campo] || "0").replace(",", ".")) || 0;
-    setParametros(prev => ({ ...prev, [campo]: num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
-  };
-
-  const sairCampoSlider = (campo, min, max) => {
-    setInputFoco(prev => ({ ...prev, [campo]: false }));
-    const num = parseFloat((inputTemp[campo] || "0").replace(",", "."));
-    if (!isNaN(num)) setP(campo, String(Math.min(max, Math.max(min, num))));
-  };
 
   const InfoIcon = ({ campo }) => (
     <span style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: 4 }}
@@ -439,7 +451,7 @@ export default function App() {
           </div>
 
           {/* Campos */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
+          <div ref={sidebarRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
             <AccordionSection title="Fase de Acumulação" icon="📈" open={accOpen} onToggle={() => setAccOpen(!accOpen)}>
               <MoneyField label="Patrimônio Inicial" campo="patrimonioInicial" />
               <MoneyField label="Aporte Mensal" campo="aporteMensal" />
