@@ -229,6 +229,27 @@ export default function App() {
     backdropFilter: "blur(12px)",
   };
 
+  // Estado elevado para inputs — evita re-renders ao hover
+  const [inputFoco, setInputFoco] = useState({});
+  const [inputTemp, setInputTemp] = useState({});
+
+  const focarCampo = (campo, valorAtual) => {
+    setInputFoco(prev => ({ ...prev, [campo]: true }));
+    setInputTemp(prev => ({ ...prev, [campo]: String(valorAtual).replace(/\./g, "").replace(",", ".") }));
+  };
+
+  const sairCampoMoeda = (campo) => {
+    setInputFoco(prev => ({ ...prev, [campo]: false }));
+    const num = parseFloat((inputTemp[campo] || "0").replace(",", ".")) || 0;
+    setParametros(prev => ({ ...prev, [campo]: num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }));
+  };
+
+  const sairCampoSlider = (campo, min, max) => {
+    setInputFoco(prev => ({ ...prev, [campo]: false }));
+    const num = parseFloat((inputTemp[campo] || "0").replace(",", "."));
+    if (!isNaN(num)) setP(campo, String(Math.min(max, Math.max(min, num))));
+  };
+
   const InfoIcon = ({ campo }) => (
     <span style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: 4 }}
       onMouseEnter={() => setTooltipAtivo(campo)} onMouseLeave={() => setTooltipAtivo(null)}>
@@ -241,34 +262,10 @@ export default function App() {
     </span>
   );
 
-  // Campo monetário — digita livremente, formata ao sair (onBlur)
+  // Campo monetário — estado elevado, sem re-render ao hover
   const MoneyField = ({ label, campo }) => {
-    const [editando, setEditando] = useState(false);
-    const [valorLocal, setValorLocal] = useState("");
-
-    const valorFormatado = parametros[campo] || "";
-    const valorNumerico = limparMoeda(valorFormatado);
-
-    const aoFocar = () => {
-      setEditando(true);
-      setValorLocal(valorNumerico > 0 ? String(valorNumerico) : "");
-    };
-
-    const aoSair = () => {
-      setEditando(false);
-      const num = parseFloat(valorLocal.replace(/\./g, "").replace(",", ".")) || 0;
-      setParametros(prev => ({
-        ...prev,
-        [campo]: num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-      }));
-    };
-
-    const aoDigitar = (e) => {
-      // Permite só números, vírgula e ponto
-      const val = e.target.value.replace(/[^0-9.,]/g, "");
-      setValorLocal(val);
-    };
-
+    const emFoco = inputFoco[campo] || false;
+    const valorBruto = limparMoeda(parametros[campo] || "");
     return (
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
@@ -276,59 +273,40 @@ export default function App() {
           <InfoIcon campo={campo} />
         </div>
         <div style={{ position: "relative" }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, fontFamily: C.sans, pointerEvents: "none" }}>R$</span>
-          <input
-            type="text"
-            value={editando ? valorLocal : valorFormatado}
-            onFocus={aoFocar}
-            onBlur={aoSair}
-            onChange={aoDigitar}
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, pointerEvents: "none" }}>R$</span>
+          <input type="text"
+            value={emFoco ? (inputTemp[campo] || "") : (parametros[campo] || "")}
+            onFocus={() => focarCampo(campo, valorBruto > 0 ? valorBruto : "")}
+            onBlur={() => sairCampoMoeda(campo)}
+            onChange={e => setInputTemp(prev => ({ ...prev, [campo]: e.target.value.replace(/[^0-9.,]/g, "") }))}
             placeholder="0,00"
-            style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 8, paddingBottom: 8, background: C.surface2, border: `1px solid ${editando ? C.indigo : C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
+            style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 8, paddingBottom: 8, background: C.surface2, border: `1px solid ${emFoco ? C.indigo : C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
           />
         </div>
       </div>
     );
   };
 
-  // Campo percentual — slider 0,1% + input digitável
-  const SliderField = ({ label, campo, min, max, step = 0.1, suffix = "%" }) => {
+  // Campo percentual — slider suave + input digitável, sem re-render ao hover
+  const SliderField = ({ label, campo, min, max, suffix = "%" }) => {
     const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
-    const [inputLocal, setInputLocal] = useState("");
-    const [editandoInput, setEditandoInput] = useState(false);
-
-    const aoFocarInput = () => {
-      setEditandoInput(true);
-      setInputLocal(String(raw));
-    };
-
-    const aoSairInput = () => {
-      setEditandoInput(false);
-      const num = parseFloat(inputLocal.replace(",", "."));
-      if (!isNaN(num)) {
-        const clamped = Math.min(max, Math.max(min, num));
-        setP(campo, String(clamped));
-      }
-    };
-
+    const emFoco = inputFoco[campo] || false;
     return (
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}<InfoIcon campo={campo} /></span>
-        <div style={{ position: "relative" }}>
-          <input
-            type="text"
-            value={editandoInput ? inputLocal : raw.toFixed(1)}
-            onFocus={aoFocarInput}
-            onBlur={aoSairInput}
-            onChange={e => setInputLocal(e.target.value.replace(/[^0-9.,]/g, ""))}
-            style={{ width: 58, textAlign: "center", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${editandoInput ? C.indigo : C.border}`, borderRadius: 6, padding: "3px 24px 3px 6px", outline: "none", transition: "border-color 0.2s" }}
-          />
-          <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
+          <div style={{ position: "relative" }}>
+            <input type="text"
+              value={emFoco ? (inputTemp[campo] || "") : raw.toFixed(1)}
+              onFocus={() => focarCampo(campo, raw)}
+              onBlur={() => sairCampoSlider(campo, min, max)}
+              onChange={e => setInputTemp(prev => ({ ...prev, [campo]: e.target.value.replace(/[^0-9.,]/g, "") }))}
+              style={{ width: 72, textAlign: "right", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${emFoco ? C.indigo : C.border}`, borderRadius: 6, padding: "3px 22px 3px 8px", outline: "none", transition: "border-color 0.2s" }}
+            />
+            <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
+          </div>
         </div>
-        </div>
-        <input
-          type="range" min={min} max={max} step={0.1} value={raw}
+        <input type="range" min={min} max={max} step={0.1} value={raw}
           onChange={e => setP(campo, e.target.value)}
           style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }}
         />
@@ -339,7 +317,7 @@ export default function App() {
     );
   };
 
-  // Campo inteiro — digita livremente
+  // Campo inteiro
   const IntField = ({ label, campo, suffix = "" }) => (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
@@ -347,12 +325,8 @@ export default function App() {
         <InfoIcon campo={campo} />
       </div>
       <div style={{ position: "relative" }}>
-        <input
-          type="number"
-          value={parametros[campo]}
-          onChange={e => setP(campo, e.target.value)}
-          min={1} max={60}
-          style={{ width: "100%", padding: "8px 36px 8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", WebkitAppearance: "none", MozAppearance: "textfield" }}
+        <input type="number" value={parametros[campo]} onChange={e => setP(campo, e.target.value)} min={1} max={60}
+          style={{ width: "100%", padding: "8px 40px 8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", WebkitAppearance: "none", MozAppearance: "textfield" }}
         />
         {suffix && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>{suffix}</span>}
       </div>
@@ -531,8 +505,8 @@ export default function App() {
           {/* Cards linha 1 — resultados */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, marginBottom: 14 }}>
             <MetricCard label="Patrimônio Real" value={fmtCpct(resumo.patrimonioAcumuladoReal)} sub="Poder de compra de hoje" accent={C.indigo} icon="📈" />
-            <MetricCard label="Renda Mensal Projetada" value={fmtBRL(resumo.rendaMensalRealInicial)} sub="Poder de compra de hoje" accent={C.emerald} icon="💰" />
             <MetricCard label="Patrimônio Nominal" value={fmtCpct(resumo.patrimonioAcumuladoNominal)} sub="Fim da acumulação" accent={C.slate} icon="🏦" />
+            <MetricCard label="Renda Mensal Projetada" value={fmtBRL(resumo.rendaMensalRealInicial)} sub="Poder de compra de hoje" accent={C.emerald} icon="💰" />
           </div>
 
           {/* Cards linha 2 — metas */}
