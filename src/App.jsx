@@ -187,6 +187,9 @@ export default function App() {
   const faixaAporte = useMemo(() => { const mil = Math.max(0, Math.round(p.aporteMensal/1000)); const inicio = Math.max(0, mil-15); return { inicio, fim: Math.max(inicio+25, mil+15) }; }, [p.aporteMensal]);
   const sensibilidadeAporte = useMemo(() => { const arr = []; for (let a = faixaAporte.inicio; a <= faixaAporte.fim; a++) { const anos = calcularTempoParaMeta({ ...p, aporteMensal: a*1000 }); if (anos !== null) arr.push({ aporteMil: a, anos }); } return arr; }, [p, faixaAporte]);
 
+  const faixaPat = useMemo(() => { const mil = Math.max(100, Math.round(p.patrimonioInicial/1000)); const passo = 100; const inicio = Math.max(passo, mil-passo*8); return { inicio, fim: Math.max(inicio+passo*16, mil+passo*8), passo }; }, [p.patrimonioInicial]);
+  const sensibilidadePat = useMemo(() => { const arr = []; for (let pt = faixaPat.inicio; pt <= faixaPat.fim; pt += faixaPat.passo) { const anos = calcularTempoParaMeta({ ...p, patrimonioInicial: pt*1000 }); if (anos !== null) arr.push({ patrimonioMil: pt, anos }); } return arr; }, [p, faixaPat]);
+
   const resumoExecutivo = useMemo(() => {
     const prazo = anosCasoAtual;
     const patReal = resumo.patrimonioAcumuladoReal;
@@ -238,17 +241,97 @@ export default function App() {
     </span>
   );
 
-  const SliderField = ({ label, campo, min, max, step = 0.1, suffix = "%" }) => {
-    const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
+  // Campo monetário — digita livremente, formata ao sair (onBlur)
+  const MoneyField = ({ label, campo }) => {
+    const [editando, setEditando] = useState(false);
+    const [valorLocal, setValorLocal] = useState("");
+
+    const valorFormatado = parametros[campo] || "";
+    const valorNumerico = limparMoeda(valorFormatado);
+
+    const aoFocar = () => {
+      setEditando(true);
+      setValorLocal(valorNumerico > 0 ? String(valorNumerico) : "");
+    };
+
+    const aoSair = () => {
+      setEditando(false);
+      const num = parseFloat(valorLocal.replace(/\./g, "").replace(",", ".")) || 0;
+      setParametros(prev => ({
+        ...prev,
+        [campo]: num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      }));
+    };
+
+    const aoDigitar = (e) => {
+      // Permite só números, vírgula e ponto
+      const val = e.target.value.replace(/[^0-9.,]/g, "");
+      setValorLocal(val);
+    };
+
     return (
       <div style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
+          <InfoIcon campo={campo} />
+        </div>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, fontFamily: C.sans, pointerEvents: "none" }}>R$</span>
+          <input
+            type="text"
+            value={editando ? valorLocal : valorFormatado}
+            onFocus={aoFocar}
+            onBlur={aoSair}
+            onChange={aoDigitar}
+            placeholder="0,00"
+            style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 8, paddingBottom: 8, background: C.surface2, border: `1px solid ${editando ? C.indigo : C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", transition: "border-color 0.2s" }}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Campo percentual — slider 0,1% + input digitável
+  const SliderField = ({ label, campo, min, max, step = 0.1, suffix = "%" }) => {
+    const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
+    const [inputLocal, setInputLocal] = useState("");
+    const [editandoInput, setEditandoInput] = useState(false);
+
+    const aoFocarInput = () => {
+      setEditandoInput(true);
+      setInputLocal(String(raw));
+    };
+
+    const aoSairInput = () => {
+      setEditandoInput(false);
+      const num = parseFloat(inputLocal.replace(",", "."));
+      if (!isNaN(num)) {
+        const clamped = Math.min(max, Math.max(min, num));
+        setP(campo, String(clamped));
+      }
+    };
+
+    return (
+      <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}<InfoIcon campo={campo} /></span>
-          <span style={{ fontSize: 13, color: C.white, fontFamily: C.mono, background: C.surface2, padding: "2px 8px", borderRadius: 6, border: `1px solid ${C.border}` }}>{raw.toFixed(step < 1 ? 1 : 0)}{suffix}</span>
+        <div style={{ position: "relative" }}>
+          <input
+            type="text"
+            value={editandoInput ? inputLocal : raw.toFixed(1)}
+            onFocus={aoFocarInput}
+            onBlur={aoSairInput}
+            onChange={e => setInputLocal(e.target.value.replace(/[^0-9.,]/g, ""))}
+            style={{ width: 58, textAlign: "center", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${editandoInput ? C.indigo : C.border}`, borderRadius: 6, padding: "3px 24px 3px 6px", outline: "none", transition: "border-color 0.2s" }}
+          />
+          <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
         </div>
-        <input type="range" min={min} max={max} step={step} value={raw}
+        </div>
+        <input
+          type="range" min={min} max={max} step={0.1} value={raw}
           onChange={e => setP(campo, e.target.value)}
-          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }} />
+          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }}
+        />
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 3, fontFamily: C.sans }}>
           <span>{min}{suffix}</span><span>{max}{suffix}</span>
         </div>
@@ -256,20 +339,7 @@ export default function App() {
     );
   };
 
-  const MoneyField = ({ label, campo }) => (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
-        <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
-        <InfoIcon campo={campo} />
-      </div>
-      <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, fontFamily: C.sans }}>R$</span>
-        <input value={parametros[campo]} onChange={e => setM(campo, e.target.value)}
-          style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 8, paddingBottom: 8, background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box" }} />
-      </div>
-    </div>
-  );
-
+  // Campo inteiro — digita livremente
   const IntField = ({ label, campo, suffix = "" }) => (
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
@@ -277,9 +347,14 @@ export default function App() {
         <InfoIcon campo={campo} />
       </div>
       <div style={{ position: "relative" }}>
-        <input value={parametros[campo]} onChange={e => setP(campo, e.target.value.replace(/\D/g, ""))}
-          style={{ width: "100%", padding: "8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box" }} />
-        {suffix && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate }}>{suffix}</span>}
+        <input
+          type="number"
+          value={parametros[campo]}
+          onChange={e => setP(campo, e.target.value)}
+          min={1} max={60}
+          style={{ width: "100%", padding: "8px 36px 8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", WebkitAppearance: "none", MozAppearance: "textfield" }}
+        />
+        {suffix && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>{suffix}</span>}
       </div>
     </div>
   );
@@ -496,51 +571,47 @@ export default function App() {
                 </div>
               </GlassCard>
 
-              {/* Grid 2 colunas */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Renda mensal no usufruto */}
+              <GlassCard>
+                <SectionTitle>Renda Mensal no Usufruto</SectionTitle>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={dadosRendaMensal} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={C.emerald} stopOpacity={0.3} />
+                          <stop offset="100%" stopColor={C.emerald} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                      <Tooltip formatter={v => [fmtBRL(v), "Renda"]} {...chartProps.tooltip} />
+                      {p.rendaMensalDesejada > 0 && <ReferenceLine y={p.rendaMensalDesejada} stroke={C.indigo} strokeDasharray="4 4" label={{ value: "Meta", position: "insideTopRight", fill: C.indigo, fontSize: 10 }} />}
+                      <Area type="monotone" dataKey="rendaMensal" stroke={C.emerald} strokeWidth={2} fill="url(#gradR)" dot={false} activeDot={{ r: 4, fill: C.emerald }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </GlassCard>
 
-                {/* Renda mensal no usufruto */}
-                <GlassCard>
-                  <SectionTitle>Renda Mensal no Usufruto</SectionTitle>
-                  <div style={{ height: 220 }}>
-                    <ResponsiveContainer>
-                      <AreaChart data={dadosRendaMensal} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={C.emerald} stopOpacity={0.3} />
-                            <stop offset="100%" stopColor={C.emerald} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid {...chartProps.cartesianGrid} />
-                        <XAxis dataKey="ano" {...chartProps.xAxis} />
-                        <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
-                        <Tooltip formatter={v => [fmtBRL(v), "Renda"]} {...chartProps.tooltip} />
-                        {p.rendaMensalDesejada > 0 && <ReferenceLine y={p.rendaMensalDesejada} stroke={C.indigo} strokeDasharray="4 4" label={{ value: "Meta", position: "insideTopRight", fill: C.indigo, fontSize: 10 }} />}
-                        <Area type="monotone" dataKey="rendaMensal" stroke={C.emerald} strokeWidth={2} fill="url(#gradR)" dot={false} activeDot={{ r: 4, fill: C.emerald }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                </GlassCard>
-
-                {/* Fluxos */}
-                <GlassCard>
-                  <SectionTitle>Fluxos Anuais</SectionTitle>
-                  <div style={{ height: 220 }}>
-                    <ResponsiveContainer>
-                      <BarChart data={dadosFluxos} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                        <CartesianGrid {...chartProps.cartesianGrid} />
-                        <XAxis dataKey="ano" {...chartProps.xAxis} />
-                        <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
-                        <Tooltip formatter={v => [fmtBRL(v)]} labelFormatter={l => `Ano ${l}`} {...chartProps.tooltip} />
-                        <ReferenceLine x={p.prazoAcumulacao} stroke={C.slate2} strokeDasharray="3 3" />
-                        <Bar dataKey="fluxo" radius={[4,4,0,0]}>
-                          {dadosFluxos.map((e, i) => <Cell key={i} fill={e.cor} fillOpacity={0.85} />)}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </GlassCard>
-              </div>
+              {/* Fluxos */}
+              <GlassCard>
+                <SectionTitle>Fluxos Anuais</SectionTitle>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={dadosFluxos} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                      <Tooltip formatter={v => [fmtBRL(v)]} labelFormatter={l => `Ano ${l}`} {...chartProps.tooltip} />
+                      <ReferenceLine x={p.prazoAcumulacao} stroke={C.slate2} strokeDasharray="3 3" />
+                      <Bar dataKey="fluxo" radius={[4,4,0,0]}>
+                        {dadosFluxos.map((e, i) => <Cell key={i} fill={e.cor} fillOpacity={0.85} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </GlassCard>
 
               {/* Total investido vs rendimento */}
               <GlassCard>
@@ -575,9 +646,10 @@ export default function App() {
 
           {/* ABA: SENSIBILIDADE */}
           {abaAtiva === "sensibilidade" && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gap: 16 }}>
               <SensChart title="Sensibilidade · Renda Desejada" data={sensibilidadeRenda} xKey="rendaMil" xLabel="Renda mensal (mil R$)" lineColor={C.indigo} currentX={p.rendaMensalDesejada/1000} currentY={anosCasoAtual} tipPrefix="Renda" fmtX={l => `R$${l}k`} />
               <SensChart title="Sensibilidade · Aporte Mensal" data={sensibilidadeAporte} xKey="aporteMil" xLabel="Aporte mensal (mil R$)" lineColor={C.emerald} currentX={p.aporteMensal/1000} currentY={anosCasoAtual} tipPrefix="Aporte" fmtX={l => `R$${l}k`} />
+              <SensChart title="Sensibilidade · Patrimônio Inicial" data={sensibilidadePat} xKey="patrimonioMil" xLabel="Patrimônio inicial (mil R$)" lineColor={C.amber} currentX={p.patrimonioInicial/1000} currentY={anosCasoAtual} tipPrefix="Patrimônio" fmtX={l => `R$${Number(l).toLocaleString("pt-BR")}k`} />
             </div>
           )}
 
