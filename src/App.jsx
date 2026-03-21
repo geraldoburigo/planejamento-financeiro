@@ -1,18 +1,17 @@
 import { useMemo, useState, useEffect } from "react";
-import { AreaChart, Area, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceDot, Legend } from "recharts";
+import { AreaChart, Area, BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceDot } from "recharts";
 
 function calcularSimulacao(parametros) {
   const { patrimonioInicial, aporteMensal, crescimentoAporteAnual, retornoNominalAcumulacao, retornoNominalUsufruto, inflacao, prazoAcumulacao, prazoUsufruto, taxaRetiradaAnual, modoUsufruto } = parametros;
   const dados = [];
   let patrimonioNominal = patrimonioInicial, fatorInflacao = 1, patrimonioReal = patrimonioInicial;
-  const txAccMes  = Math.pow(1 + retornoNominalAcumulacao, 1/12) - 1;
-  const txUsuMes  = Math.pow(1 + retornoNominalUsufruto,   1/12) - 1;
-  const txInflMes = Math.pow(1 + inflacao,                 1/12) - 1;
+  const txAccMes = Math.pow(1 + retornoNominalAcumulacao, 1/12) - 1;
+  const txUsuMes = Math.pow(1 + retornoNominalUsufruto, 1/12) - 1;
+  const txInflMes = Math.pow(1 + inflacao, 1/12) - 1;
   const txCrescAporteMes = Math.pow(1 + crescimentoAporteAnual, 1/12) - 1;
   const totalMeses = (prazoAcumulacao + prazoUsufruto) * 12;
   let rendaMensalReal = 0, anoEsgotamento = null, resgateAcum = 0;
-  let aporteAtual = aporteMensal;
-  let totalInvestido = patrimonioInicial;
+  let aporteAtual = aporteMensal, totalInvestido = patrimonioInicial;
   dados.push({ ano: 0, fase: "Acumulação", patrimonioNominal, patrimonioReal, resgateAnualReal: 0, rendaMensalReal: 0, totalInvestido, rendimento: 0 });
   for (let mes = 1; mes <= totalMeses; mes++) {
     const ano = Math.floor(mes / 12);
@@ -26,11 +25,7 @@ function calcularSimulacao(parametros) {
       if (mes % 12 === 0) dados.push({ ano, fase: "Acumulação", patrimonioNominal, patrimonioReal, resgateAnualReal: 0, rendaMensalReal: 0, totalInvestido, rendimento: Math.max(0, patrimonioNominal - totalInvestido) });
     } else {
       if (mes === prazoAcumulacao * 12 + 1) { rendaMensalReal = (patrimonioReal * taxaRetiradaAnual) / 12; resgateAcum = 0; }
-      if (patrimonioNominal <= 0) {
-        fatorInflacao *= 1 + txInflMes;
-        if (mes % 12 === 0) dados.push({ ano, fase: "Usufruto", patrimonioNominal: 0, patrimonioReal: 0, resgateAnualReal: 0, rendaMensalReal: 0, totalInvestido, rendimento: 0 });
-        continue;
-      }
+      if (patrimonioNominal <= 0) { fatorInflacao *= 1 + txInflMes; if (mes % 12 === 0) dados.push({ ano, fase: "Usufruto", patrimonioNominal: 0, patrimonioReal: 0, resgateAnualReal: 0, rendaMensalReal: 0, totalInvestido, rendimento: 0 }); continue; }
       const retMes = patrimonioNominal * txUsuMes;
       let retNom, retRealMes;
       if (modoUsufruto === "fixa") { retNom = rendaMensalReal * fatorInflacao; retRealMes = rendaMensalReal; }
@@ -48,13 +43,14 @@ function calcularSimulacao(parametros) {
     }
   }
   const fimAcc = dados.find(d => d.ano === prazoAcumulacao && d.fase === "Acumulação");
-  return { dados, resumo: { patrimonioAcumuladoNominal: fimAcc?.patrimonioNominal ?? 0, patrimonioAcumuladoReal: fimAcc?.patrimonioReal ?? 0, rendaMensalRealInicial: ((fimAcc?.patrimonioReal ?? 0) * taxaRetiradaAnual) / 12, anoEsgotamento, totalInvestido: fimAcc?.totalInvestido ?? 0, rendimento: fimAcc?.rendimento ?? 0 } };
+  const inicioUsu = dados.find(d => d.fase === "Usufruto");
+  return { dados, resumo: { patrimonioAcumuladoNominal: fimAcc?.patrimonioNominal ?? 0, patrimonioAcumuladoReal: fimAcc?.patrimonioReal ?? 0, rendaMensalRealInicial: inicioUsu?.rendaMensalReal ?? ((fimAcc?.patrimonioReal ?? 0) * taxaRetiradaAnual / 12), anoEsgotamento, totalInvestido: fimAcc?.totalInvestido ?? 0, rendimento: fimAcc?.rendimento ?? 0 } };
 }
 
 function calcularTempoParaMeta({ patrimonioInicial, aporteMensal, crescimentoAporteAnual = 0, retornoNominalAcumulacao, inflacao, taxaRetiradaAnual, rendaMensalDesejada, maxAnos = 80 }) {
   if (taxaRetiradaAnual <= 0 || rendaMensalDesejada <= 0) return null;
   const alvo = (rendaMensalDesejada * 12) / taxaRetiradaAnual;
-  const txNomMes  = Math.pow(1 + retornoNominalAcumulacao, 1/12) - 1;
+  const txNomMes = Math.pow(1 + retornoNominalAcumulacao, 1/12) - 1;
   const txInflMes = Math.pow(1 + inflacao, 1/12) - 1;
   const txRealMes = (1 + txNomMes) / (1 + txInflMes) - 1;
   const txCrescMes = Math.pow(1 + crescimentoAporteAnual, 1/12) - 1;
@@ -79,26 +75,46 @@ const DEFAULTS = {
 const TOOLTIPS = {
   patrimonioInicial: "Valor que você já possui investido hoje.",
   aporteMensal: "Quanto você investe por mês durante a fase de acumulação.",
-  crescimentoAporteAnual: "Percentual de aumento do aporte a cada ano. Ex: 5% = aporte cresce 5% ao ano.",
-  retornoNominalAcumulacao: "Retorno bruto anual esperado durante a fase de acumulação. Ex: Tesouro IPCA+ ~12%.",
-  retornoNominalUsufruto: "Retorno bruto anual esperado durante a fase de retiradas. Tende a ser menor pois o portfólio é mais conservador.",
-  inflacao: "Inflação anual esperada para corrigir o poder de compra. Meta do Banco Central: 3%.",
-  prazoAcumulacao: "Por quantos anos você pretende acumular patrimônio antes de começar a retirar.",
-  prazoUsufruto: "Por quantos anos você pretende viver do patrimônio acumulado.",
-  taxaRetiradaAnual: "Percentual do patrimônio retirado por ano. A regra dos 4% sugere sustentabilidade por 30+ anos.",
-  modoUsufruto: "Fixa: mantém o poder de compra da renda. Variável: retira sempre o mesmo % do patrimônio atual.",
-  rendaMensalDesejada: "Renda mensal que você deseja ter na aposentadoria, em valores de hoje.",
+  crescimentoAporteAnual: "Percentual de aumento do aporte a cada ano.",
+  retornoNominalAcumulacao: "Retorno bruto anual esperado na acumulação.",
+  retornoNominalUsufruto: "Retorno bruto anual esperado no usufruto.",
+  inflacao: "Inflação anual esperada para corrigir o poder de compra.",
+  prazoAcumulacao: "Anos de acumulação antes de começar a retirar.",
+  prazoUsufruto: "Anos vivendo do patrimônio acumulado.",
+  taxaRetiradaAnual: "% do patrimônio retirado por ano. Regra dos 4% = sustentabilidade por 30+ anos.",
+  modoUsufruto: "Fixa: mantém poder de compra. Variável: retira % do patrimônio atual.",
+  rendaMensalDesejada: "Renda mensal desejada na aposentadoria, em valores de hoje.",
+};
+
+const C = {
+  bg:       "#0f172a",
+  surface:  "#1e293b",
+  surface2: "#273344",
+  border:   "rgba(255,255,255,0.08)",
+  border2:  "rgba(255,255,255,0.14)",
+  indigo:   "#6366f1",
+  emerald:  "#10b981",
+  amber:    "#f59e0b",
+  rose:     "#f43f5e",
+  slate:    "#94a3b8",
+  slate2:   "#64748b",
+  white:    "#f8fafc",
+  white2:   "#e2e8f0",
+  mono:     "'JetBrains Mono', 'Roboto Mono', monospace",
+  sans:     "'Inter', 'Manrope', system-ui, sans-serif",
 };
 
 export default function App() {
   const [parametros, setParametros] = useState(() => {
-    try { const s = localStorage.getItem("pf-params"); return s ? JSON.parse(s) : DEFAULTS; } catch { return DEFAULTS; }
+    try { const s = localStorage.getItem("pf-v2"); return s ? JSON.parse(s) : DEFAULTS; } catch { return DEFAULTS; }
   });
+  const [accOpen, setAccOpen] = useState(true);
+  const [usuOpen, setUsuOpen] = useState(true);
+  const [abaAtiva, setAbaAtiva] = useState("graficos");
   const [tooltipAtivo, setTooltipAtivo] = useState(null);
-  const [erros, setErros] = useState({});
 
   useEffect(() => {
-    try { localStorage.setItem("pf-params", JSON.stringify(parametros)); } catch {}
+    try { localStorage.setItem("pf-v2", JSON.stringify(parametros)); } catch {}
   }, [parametros]);
 
   const limparMoeda      = v => !v ? 0 : Number(v.replace(/\./g, "").replace(",", ".")) || 0;
@@ -108,23 +124,6 @@ export default function App() {
     const d = valor.replace(/\D/g, "");
     if (!d) return "";
     return (Number(d) / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  const validar = (campo, valor) => {
-    const e = { ...erros };
-    const num = parseFloat(valor.replace(",", "."));
-    if (["retornoNominalAcumulacao","retornoNominalUsufruto","inflacao","taxaRetiradaAnual","crescimentoAporteAnual"].includes(campo)) {
-      if (isNaN(num) || num < 0) e[campo] = "Valor deve ser positivo";
-      else if (num > 50) e[campo] = "Valor parece muito alto";
-      else delete e[campo];
-    }
-    if (["prazoAcumulacao","prazoUsufruto"].includes(campo)) {
-      const n = parseInt(valor);
-      if (isNaN(n) || n <= 0) e[campo] = "Deve ser maior que zero";
-      else if (n > 60) e[campo] = "Máximo 60 anos";
-      else delete e[campo];
-    }
-    setErros(e);
   };
 
   const p = useMemo(() => ({
@@ -149,14 +148,20 @@ export default function App() {
   const aporteNecessario = useMemo(() => {
     if (p.taxaRetiradaAnual <= 0 || p.rendaMensalDesejada <= 0 || p.prazoAcumulacao <= 0) return null;
     const alvo = (p.rendaMensalDesejada * 12) / p.taxaRetiradaAnual;
-    const txRealMes = (1 + Math.pow(1 + p.retornoNominalAcumulacao, 1/12) - 1) / (1 + Math.pow(1 + p.inflacao, 1/12) - 1) - 1;
+    const txNomMes = Math.pow(1 + p.retornoNominalAcumulacao, 1/12) - 1;
     const txInflMes = Math.pow(1 + p.inflacao, 1/12) - 1;
+    const txRealMes = (1 + txNomMes) / (1 + txInflMes) - 1;
+    const txCrescMes = Math.pow(1 + p.crescimentoAporteAnual, 1/12) - 1;
     const n = p.prazoAcumulacao * 12;
-    let low = 0, high = alvo / n * 2, resultado = null;
-    for (let iter = 0; iter < 60; iter++) {
+    let low = 0, high = alvo / n * 3, resultado = null;
+    for (let iter = 0; iter < 80; iter++) {
       const mid = (low + high) / 2;
-      let pat = p.patrimonioInicial, fat = 1;
-      for (let mes = 1; mes <= n; mes++) { fat *= 1 + txInflMes; pat = pat * (1 + txRealMes) + mid / fat; }
+      let pat = p.patrimonioInicial, fat = 1, ap = mid;
+      for (let mes = 1; mes <= n; mes++) {
+        if (mes > 1 && p.crescimentoAporteAnual > 0) ap *= (1 + txCrescMes);
+        fat *= 1 + txInflMes;
+        pat = pat * (1 + txRealMes) + ap / fat;
+      }
       if (pat >= alvo) { resultado = mid; high = mid; } else low = mid;
     }
     return resultado;
@@ -165,7 +170,7 @@ export default function App() {
   const dadosFluxos = useMemo(() => dados.filter(i => i.ano > 0).map(i => ({
     ano: i.ano, fase: i.fase,
     fluxo: i.fase === "Acumulação" ? i.totalInvestido - (dados.find(d => d.ano === i.ano - 1)?.totalInvestido ?? p.patrimonioInicial) : i.resgateAnualReal,
-    cor: i.fase === "Acumulação" ? "#16a34a" : "#2563eb",
+    cor: i.fase === "Acumulação" ? C.emerald : C.indigo,
   })), [dados, p]);
 
   const dadosEmpilhado = useMemo(() => dados.filter(d => d.fase === "Acumulação").map(d => ({
@@ -182,40 +187,27 @@ export default function App() {
   const faixaAporte = useMemo(() => { const mil = Math.max(0, Math.round(p.aporteMensal/1000)); const inicio = Math.max(0, mil-15); return { inicio, fim: Math.max(inicio+25, mil+15) }; }, [p.aporteMensal]);
   const sensibilidadeAporte = useMemo(() => { const arr = []; for (let a = faixaAporte.inicio; a <= faixaAporte.fim; a++) { const anos = calcularTempoParaMeta({ ...p, aporteMensal: a*1000 }); if (anos !== null) arr.push({ aporteMil: a, anos }); } return arr; }, [p, faixaAporte]);
 
-  const faixaPat = useMemo(() => { const mil = Math.max(100, Math.round(p.patrimonioInicial/1000)); const passo = 100; const inicio = Math.max(passo, mil-passo*8); return { inicio, fim: Math.max(inicio+passo*16, mil+passo*8), passo }; }, [p.patrimonioInicial]);
-  const sensibilidadePat = useMemo(() => { const arr = []; for (let pt = faixaPat.inicio; pt <= faixaPat.fim; pt += faixaPat.passo) { const anos = calcularTempoParaMeta({ ...p, patrimonioInicial: pt*1000 }); if (anos !== null) arr.push({ patrimonioMil: pt, anos }); } return arr; }, [p, faixaPat]);
-
-  const set  = (campo, valor) => { setParametros(prev => ({ ...prev, [campo]: valor })); validar(campo, valor); };
-  const setM = (campo, valor) => setParametros(prev => ({ ...prev, [campo]: formatarMoedaInput(valor) }));
-
-  const fmtBRL  = v => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v || 0);
-  const fmtCpct = v => v >= 1e6 ? `R$ ${(v/1e6).toFixed(2).replace(".",",")} mi` : v >= 1e3 ? `R$ ${(v/1e3).toFixed(2).replace(".",",")} mil` : fmtBRL(v);
-  const fmtMi   = v => `R$ ${(v/1e6).toFixed(1).replace(".",",")} mi`;
-  const fmtInt  = v => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(v || 0);
-
   const resumoExecutivo = useMemo(() => {
     const prazo = anosCasoAtual;
-    const rendaProjetada = resumo.rendaMensalRealInicial;
     const patReal = resumo.patrimonioAcumuladoReal;
     const heranca = dados.filter(d => d.fase === "Usufruto").slice(-1)[0]?.patrimonioReal ?? 0;
     const atingeMeta = patReal >= patrimonioNecessario;
+    const fmtC = v => v >= 1e6 ? `R$ ${(v/1e6).toFixed(2).replace(".",",")} mi` : v >= 1e3 ? `R$ ${(v/1e3).toFixed(0)} mil` : `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
     const fmtB = v => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v || 0);
-    const fmtC = v => v >= 1e6 ? `R$ ${(v/1e6).toFixed(2).replace(".",",")} mi` : v >= 1e3 ? `R$ ${(v/1e3).toFixed(0)} mil` : fmtB(v);
-    let t = `Com os parâmetros atuais, `;
-    t += prazo ? `você atingirá sua meta em aproximadamente ${prazo.toFixed(1).replace(".", ",")} anos. ` : `a meta não é atingida dentro de 80 anos — considere aumentar o aporte ou reduzir a renda desejada. `;
-    t += `Ao final dos ${p.prazoAcumulacao} anos de acumulação, seu patrimônio real será de ${fmtC(patReal)}, `;
-    t += atingeMeta ? `superando o patrimônio necessário de ${fmtC(patrimonioNecessario)}. ` : `abaixo do patrimônio necessário de ${fmtC(patrimonioNecessario)}. `;
-    t += `A renda mensal projetada será de ${fmtB(rendaProjetada)} em poder de compra de hoje`;
-    t += rendaProjetada >= p.rendaMensalDesejada ? `, superando sua meta de ${fmtB(p.rendaMensalDesejada)}. ` : `, abaixo da sua meta de ${fmtB(p.rendaMensalDesejada)}. `;
-    if (resumo.anoEsgotamento) {
-      t += `Atenção: o patrimônio se esgota no ano ${resumo.anoEsgotamento}. Considere reduzir a taxa de retirada ou aumentar o prazo de acumulação.`;
-    } else {
-      t += `O patrimônio sustenta o usufruto por todos os ${p.prazoUsufruto} anos planejados`;
-      t += heranca > 0 ? `, deixando uma herança projetada de ${fmtC(heranca)}.` : `.`;
-    }
-    if (p.crescimentoAporteAnual > 0) t += ` O crescimento anual do aporte de ${(p.crescimentoAporteAnual * 100).toFixed(1).replace(".", ",")}% contribui significativamente para antecipar a meta.`;
+    let t = prazo ? `Com os parâmetros atuais, você atingirá sua meta em aproximadamente ${prazo.toFixed(1).replace(".", ",")} anos. ` : `A meta não é atingida em 80 anos — considere aumentar o aporte. `;
+    t += `Ao final da acumulação, patrimônio real de ${fmtC(patReal)} ${atingeMeta ? "supera" : "não atinge"} o necessário de ${fmtC(patrimonioNecessario)}. `;
+    t += `Renda projetada: ${fmtB(resumo.rendaMensalRealInicial)} em poder de compra de hoje. `;
+    if (resumo.anoEsgotamento) t += `Atenção: patrimônio se esgota no ano ${resumo.anoEsgotamento}.`;
+    else t += heranca > 0 ? `Herança projetada: ${fmtC(heranca)}.` : `Patrimônio sustenta todo o usufruto.`;
     return t;
   }, [p, resumo, anosCasoAtual, dados, patrimonioNecessario]);
+
+  const setP = (campo, valor) => setParametros(prev => ({ ...prev, [campo]: valor }));
+  const setM = (campo, valor) => setParametros(prev => ({ ...prev, [campo]: formatarMoedaInput(valor) }));
+
+  const fmtBRL  = v => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v || 0);
+  const fmtCpct = v => v >= 1e6 ? `R$ ${(v/1e6).toFixed(2).replace(".",",")} Mi` : v >= 1e3 ? `R$ ${(v/1e3).toFixed(1).replace(".",",")} K` : fmtBRL(v);
+  const fmtMi   = v => `${(v/1e6).toFixed(1)}Mi`;
 
   const exportarCSV = () => {
     const header = "Ano,Fase,Patrimônio Nominal,Patrimônio Real,Resgate Anual Real,Renda Mensal Real\n";
@@ -226,347 +218,400 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const S = {
-    card:    { borderRadius: 20, padding: "24px 22px", minHeight: 135, display: "flex", flexDirection: "column", justifyContent: "space-between", color: "#fff", boxShadow: "0 10px 30px rgba(15,23,42,0.10)" },
-    input:   { width: "100%", padding: "13px 14px", borderRadius: 12, border: "1px solid #dbe2ea", fontSize: 15, outline: "none", boxSizing: "border-box", background: "#fff", height: 46 },
-    inputErr:{ width: "100%", padding: "13px 14px", borderRadius: 12, border: "1px solid #ef4444", fontSize: 15, outline: "none", boxSizing: "border-box", background: "#fff", height: 46 },
-    label:   { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 6 },
-    badge:   { display: "inline-block", padding: "6px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" },
-    section: { background: "#fff", borderRadius: 32, padding: 28, border: "1px solid #e5e7eb", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" },
-    chart:   { background: "#f8fafc", borderRadius: 22, padding: 18 },
-    th:      { padding: 10, textAlign: "left", borderBottom: "1px solid #e2e8f0", fontSize: 13, color: "#334155", background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 },
-    td:      { padding: 10, borderBottom: "1px solid #f1f5f9", fontSize: 13, color: "#0f172a", whiteSpace: "nowrap" },
+  // ── Componentes de UI ────────────────────────────────────────────────────
+  const glass = {
+    background: "rgba(30,41,59,0.7)",
+    border: `1px solid ${C.border2}`,
+    borderRadius: 16,
+    backdropFilter: "blur(12px)",
   };
 
-  const Pref = ({ t }) => <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#475569", fontWeight: 700 }}>{t}</span>;
-  const Suf  = ({ t }) => <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#475569", fontWeight: 700 }}>{t}</span>;
-  const TipBox = ({ itens }) => (
-    <div style={{ background: "#fff", padding: 12, borderRadius: 10, border: "1px solid #e2e8f0", boxShadow: "0 8px 20px rgba(15,23,42,0.08)", fontSize: 13 }}>
-      {itens.map(([k, v], i) => <div key={i}><strong>{k}:</strong> {v}</div>)}
-    </div>
-  );
-
   const InfoIcon = ({ campo }) => (
-    <span style={{ position: "relative", display: "inline-flex" }} onMouseEnter={() => setTooltipAtivo(campo)} onMouseLeave={() => setTooltipAtivo(null)}>
-      <span style={{ width: 16, height: 16, borderRadius: "50%", background: "#e2e8f0", color: "#64748b", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", cursor: "help" }}>?</span>
+    <span style={{ position: "relative", display: "inline-flex", verticalAlign: "middle", marginLeft: 4 }}
+      onMouseEnter={() => setTooltipAtivo(campo)} onMouseLeave={() => setTooltipAtivo(null)}>
+      <span style={{ width: 14, height: 14, borderRadius: "50%", background: C.surface2, border: `1px solid ${C.border2}`, color: C.slate, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", cursor: "help", fontFamily: C.sans }}>?</span>
       {tooltipAtivo === campo && (
-        <div style={{ position: "absolute", left: 20, top: -4, zIndex: 100, background: "#1e293b", color: "#fff", fontSize: 12, padding: "8px 12px", borderRadius: 8, width: 220, lineHeight: 1.5, boxShadow: "0 8px 24px rgba(0,0,0,0.2)" }}>
+        <div style={{ position: "absolute", left: 18, top: -4, zIndex: 200, background: "#0f172a", color: C.white2, fontSize: 11, padding: "8px 12px", borderRadius: 10, width: 210, lineHeight: 1.6, border: `1px solid ${C.border2}`, boxShadow: "0 20px 40px rgba(0,0,0,0.5)", fontFamily: C.sans }}>
           {TOOLTIPS[campo]}
         </div>
       )}
     </span>
   );
 
-  const Label = ({ campo, children }) => <div style={S.label}>{children}<InfoIcon campo={campo} /></div>;
-
-  const SensChart = ({ title, subtitle, data, xKey, xLabel, lineColor, currentX, currentY, tipPrefix, fmtX }) => (
-    <section style={S.section}>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a" }}>{title}</div>
-        <div style={{ fontSize: 14, color: "#64748b", marginTop: 6 }}>{subtitle}</div>
+  const SliderField = ({ label, campo, min, max, step = 0.1, suffix = "%" }) => {
+    const raw = parseFloat((parametros[campo] || "0").replace(",", ".")) || 0;
+    return (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}<InfoIcon campo={campo} /></span>
+          <span style={{ fontSize: 13, color: C.white, fontFamily: C.mono, background: C.surface2, padding: "2px 8px", borderRadius: 6, border: `1px solid ${C.border}` }}>{raw.toFixed(step < 1 ? 1 : 0)}{suffix}</span>
+        </div>
+        <input type="range" min={min} max={max} step={step} value={raw}
+          onChange={e => setP(campo, e.target.value)}
+          style={{ width: "100%", accentColor: C.indigo, cursor: "pointer", height: 4 }} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 3, fontFamily: C.sans }}>
+          <span>{min}{suffix}</span><span>{max}{suffix}</span>
+        </div>
       </div>
-      <div style={S.chart}><div style={{ width: "100%", height: 300 }}>
-        <ResponsiveContainer>
-          <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey={xKey} tick={{ fill: "#64748b", fontSize: 12 }} stroke="#94a3b8" label={{ value: xLabel, position: "insideBottom", offset: -10, fill: "#64748b", fontSize: 12 }} />
-            <YAxis tick={{ fill: "#64748b", fontSize: 12 }} stroke="#94a3b8" label={{ value: "Anos", angle: -90, position: "insideLeft", fill: "#64748b", fontSize: 12 }} />
-            <Tooltip formatter={v => [`${Number(v).toFixed(1).replace(".",",")} anos`, "Tempo"]} labelFormatter={l => `${tipPrefix}: ${fmtX(l)}`} contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, color: "#0f172a" }} />
-            <ReferenceLine x={currentX} stroke="#94a3b8" strokeDasharray="4 4" />
-            {currentY && <ReferenceDot x={currentX} y={currentY} r={6} fill="#fff" stroke={lineColor} strokeWidth={3} />}
-            <Line type="monotone" dataKey="anos" stroke={lineColor} strokeWidth={3} dot={{ r: 3, fill: lineColor, stroke: "#fff", strokeWidth: 1 }} activeDot={{ r: 5 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div></div>
-    </section>
+    );
+  };
+
+  const MoneyField = ({ label, campo }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
+        <InfoIcon campo={campo} />
+      </div>
+      <div style={{ position: "relative" }}>
+        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, fontFamily: C.sans }}>R$</span>
+        <input value={parametros[campo]} onChange={e => setM(campo, e.target.value)}
+          style={{ width: "100%", paddingLeft: 30, paddingRight: 10, paddingTop: 8, paddingBottom: 8, background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box" }} />
+      </div>
+    </div>
   );
 
+  const IntField = ({ label, campo, suffix = "" }) => (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>{label}</span>
+        <InfoIcon campo={campo} />
+      </div>
+      <div style={{ position: "relative" }}>
+        <input value={parametros[campo]} onChange={e => setP(campo, e.target.value.replace(/\D/g, ""))}
+          style={{ width: "100%", padding: "8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box" }} />
+        {suffix && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate }}>{suffix}</span>}
+      </div>
+    </div>
+  );
+
+  const GlassCard = ({ children, style = {}, onClick }) => (
+    <div onClick={onClick}
+      style={{ ...glass, padding: "18px 20px", transition: "border-color 0.2s", cursor: onClick ? "pointer" : "default", ...style }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.borderColor = "rgba(99,102,241,0.4)"; }}
+      onMouseLeave={e => { if (onClick) e.currentTarget.style.borderColor = C.border2; }}>
+      {children}
+    </div>
+  );
+
+  const MetricCard = ({ label, value, sub, accent = C.indigo, icon }) => (
+    <GlassCard>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <span style={{ fontSize: 11, color: C.slate, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: C.sans }}>{label}</span>
+        {icon && <span style={{ fontSize: 16, opacity: 0.7 }}>{icon}</span>}
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 600, color: accent, fontFamily: C.mono, marginTop: 10, letterSpacing: "-0.02em" }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: C.slate2, marginTop: 6, fontFamily: C.sans }}>{sub}</div>}
+    </GlassCard>
+  );
+
+  const SectionTitle = ({ children }) => (
+    <div style={{ fontSize: 11, color: C.slate, textTransform: "uppercase", letterSpacing: "0.12em", fontFamily: C.sans, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: 3, height: 12, background: C.indigo, borderRadius: 2 }} />
+      {children}
+    </div>
+  );
+
+  const chartProps = {
+    cartesianGrid: { strokeDasharray: "0", horizontal: true, vertical: false, stroke: "rgba(148,163,184,0.08)" },
+    xAxis: { tick: { fill: C.slate2, fontSize: 11, fontFamily: C.sans }, axisLine: false, tickLine: false },
+    yAxis: { tick: { fill: C.slate2, fontSize: 11, fontFamily: C.sans }, axisLine: false, tickLine: false, width: 72 },
+    tooltip: { contentStyle: { background: "#0f172a", border: `1px solid ${C.border2}`, borderRadius: 10, color: C.white, fontSize: 12, fontFamily: C.sans, boxShadow: "0 20px 40px rgba(0,0,0,0.5)" } },
+  };
+
+  const CustomTooltipPatrimonio = ({ active, payload }) => {
+    if (!active || !payload?.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div style={{ ...chartProps.tooltip.contentStyle, padding: "12px 16px" }}>
+        <div style={{ color: C.slate, marginBottom: 8, fontSize: 11 }}>Ano {d.ano} · {d.fase}</div>
+        <div style={{ color: C.indigo, fontFamily: C.mono }}>Patrimônio: {fmtBRL(d.patrimonioReal)}</div>
+        {d.rendaMensalReal > 0 && <div style={{ color: C.emerald, fontFamily: C.mono, marginTop: 4 }}>Renda: {fmtBRL(d.rendaMensalReal)}</div>}
+      </div>
+    );
+  };
+
+  const SensChart = ({ title, data, xKey, xLabel, lineColor, currentX, currentY, tipPrefix, fmtX }) => (
+    <GlassCard>
+      <SectionTitle>{title}</SectionTitle>
+      <div style={{ height: 200 }}>
+        <ResponsiveContainer>
+          <LineChart data={data} margin={{ top: 5, right: 5, left: 0, bottom: 20 }}>
+            <CartesianGrid {...chartProps.cartesianGrid} />
+            <XAxis dataKey={xKey} {...chartProps.xAxis} label={{ value: xLabel, position: "insideBottom", offset: -10, fill: C.slate2, fontSize: 10 }} />
+            <YAxis {...chartProps.yAxis} label={{ value: "Anos", angle: -90, position: "insideLeft", fill: C.slate2, fontSize: 10 }} />
+            <Tooltip formatter={v => [`${Number(v).toFixed(1).replace(".",",")} anos`]} labelFormatter={l => `${tipPrefix}: ${fmtX(l)}`} {...chartProps.tooltip} />
+            <ReferenceLine x={currentX} stroke={C.slate2} strokeDasharray="4 4" />
+            {currentY && <ReferenceDot x={currentX} y={currentY} r={5} fill={C.bg} stroke={lineColor} strokeWidth={2} />}
+            <Line type="monotone" dataKey="anos" stroke={lineColor} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: lineColor }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </GlassCard>
+  );
+
+  const AccordionSection = ({ title, icon, open, onToggle, children }) => (
+    <div style={{ marginBottom: 8, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <button onClick={onToggle} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: open ? C.surface2 : "transparent", border: "none", cursor: "pointer", color: C.white2, fontFamily: C.sans, fontSize: 13, fontWeight: 500 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontSize: 14 }}>{icon}</span>{title}</span>
+        <span style={{ color: C.slate, fontSize: 10, transition: "transform 0.2s", transform: open ? "rotate(180deg)" : "none" }}>▼</span>
+      </button>
+      {open && <div style={{ padding: "14px 14px 4px", background: "rgba(15,23,42,0.3)" }}>{children}</div>}
+    </div>
+  );
+
+  const tabStyle = (aba) => ({
+    padding: "8px 18px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontFamily: C.sans, fontWeight: 500, transition: "all 0.2s",
+    background: abaAtiva === aba ? C.indigo : "transparent",
+    color: abaAtiva === aba ? "#fff" : C.slate,
+  });
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f7fb", padding: 24, fontFamily: "Arial, sans-serif", color: "#0f172a" }}>
-      <div style={{ maxWidth: 1500, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: C.sans, color: C.white }}>
+      {/* Importar fontes */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+        input[type=range]::-webkit-slider-thumb { background: ${C.indigo}; }
+        input[type=range]::-webkit-slider-runnable-track { background: ${C.surface2}; border-radius: 4px; height: 4px; }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 4px; }
+      `}</style>
 
-        <div style={{ background: "#fff", borderRadius: 28, padding: "28px 32px", boxShadow: "0 10px 30px rgba(15,23,42,0.06)", border: "1px solid #e5e7eb", marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <div style={{ width: 56, height: 56, borderRadius: 18, background: "linear-gradient(135deg, #4f46e5, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 26 }}>📊</div>
-              <div>
-                <h1 style={{ margin: 0, fontSize: 32 }}>Planejamento Financeiro</h1>
-                <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 15 }}>Simulação patrimonial com fase de acumulação e fase de usufruto</p>
-              </div>
+      <div style={{ display: "grid", gridTemplateColumns: "300px minmax(0,1fr)", minHeight: "100vh" }}>
+
+        {/* ── SIDEBAR ── */}
+        <aside style={{ background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column" }}>
+          {/* Header sidebar */}
+          <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, ${C.indigo}, #8b5cf6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📊</div>
+              <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>Parâmetros</span>
             </div>
-            <button onClick={() => setParametros(DEFAULTS)} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid #dbe2ea", background: "#f8fafc", cursor: "pointer", fontSize: 13, color: "#475569", fontWeight: 600 }}>Resetar parâmetros</button>
+            <span style={{ fontSize: 10, color: C.slate2, letterSpacing: "0.1em", textTransform: "uppercase" }}>Control Room</span>
           </div>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0,1fr)", gap: 24, alignItems: "start" }}>
+          {/* Campos */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
+            <AccordionSection title="Fase de Acumulação" icon="📈" open={accOpen} onToggle={() => setAccOpen(!accOpen)}>
+              <MoneyField label="Patrimônio Inicial" campo="patrimonioInicial" />
+              <MoneyField label="Aporte Mensal" campo="aporteMensal" />
+              <MoneyField label="Renda Mensal Desejada (meta)" campo="rendaMensalDesejada" />
+              <SliderField label="Crescimento do Aporte" campo="crescimentoAporteAnual" min={0} max={20} step={0.5} />
+              <SliderField label="Retorno Nominal (Acumulação)" campo="retornoNominalAcumulacao" min={0} max={30} step={0.5} />
+              <SliderField label="Inflação" campo="inflacao" min={0} max={20} step={0.5} />
+              <IntField label="Prazo de Acumulação" campo="prazoAcumulacao" suffix="anos" />
+            </AccordionSection>
 
-          <aside style={{ background: "#fff", borderRadius: 28, padding: 24, border: "1px solid #e5e7eb", boxShadow: "0 10px 30px rgba(15,23,42,0.06)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
-              <span style={{ fontSize: 20 }}>⚙️</span>
-              <h2 style={{ margin: 0, fontSize: 22 }}>Parâmetros</h2>
-            </div>
-
-            <span style={{ ...S.badge, background: "#e0e7ff", color: "#4338ca" }}>Acumulação</span>
-            <div style={{ display: "grid", gap: 14, marginTop: 14, marginBottom: 20 }}>
-              {[["Patrimônio Inicial", "patrimonioInicial"], ["Aporte Mensal", "aporteMensal"]].map(([lbl, campo]) => (
-                <div key={campo}>
-                  <Label campo={campo}>{lbl}</Label>
-                  <div style={{ position: "relative" }}><Pref t="R$" /><input value={parametros[campo]} onChange={e => setM(campo, e.target.value)} style={{ ...S.input, paddingLeft: 42 }} /></div>
-                </div>
-              ))}
-              <div>
-                <Label campo="crescimentoAporteAnual">Crescimento do Aporte ao Ano</Label>
-                <div style={{ position: "relative" }}>
-                  <input value={parametros.crescimentoAporteAnual || "0"} onChange={e => set("crescimentoAporteAnual", e.target.value)} style={{ ...(erros.crescimentoAporteAnual ? S.inputErr : S.input), paddingRight: 32 }} />
-                  <Suf t="%" />
-                </div>
-                {erros.crescimentoAporteAnual && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 3 }}>{erros.crescimentoAporteAnual}</div>}
+            <AccordionSection title="Fase de Usufruto" icon="🌅" open={usuOpen} onToggle={() => setUsuOpen(!usuOpen)}>
+              <SliderField label="Retorno Nominal (Usufruto)" campo="retornoNominalUsufruto" min={0} max={25} step={0.5} />
+              <SliderField label="Taxa de Retirada Anual" campo="taxaRetiradaAnual" min={1} max={10} step={0.25} />
+              <IntField label="Prazo de Usufruto" campo="prazoUsufruto" suffix="anos" />
+              <div style={{ marginBottom: 14 }}>
+                <span style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Modo de Usufruto<InfoIcon campo="modoUsufruto" /></span>
+                <select value={parametros.modoUsufruto} onChange={e => setP("modoUsufruto", e.target.value)}
+                  style={{ width: "100%", padding: "8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 12, fontFamily: C.sans, outline: "none" }}>
+                  <option value="fixa">Renda fixa real</option>
+                  <option value="variavel">Retirada percentual</option>
+                </select>
               </div>
-              {[["Retorno Nominal", "retornoNominalAcumulacao"], ["Inflação", "inflacao"]].map(([lbl, campo]) => (
-                <div key={campo}>
-                  <Label campo={campo}>{lbl}</Label>
-                  <div style={{ position: "relative" }}>
-                    <input value={parametros[campo]} onChange={e => set(campo, e.target.value)} style={{ ...(erros[campo] ? S.inputErr : S.input), paddingRight: 32 }} />
-                    <Suf t="%" />
+            </AccordionSection>
+          </div>
+
+          {/* Footer sidebar */}
+          <div style={{ padding: "14px", borderTop: `1px solid ${C.border}` }}>
+            <button onClick={() => setParametros(DEFAULTS)}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: `1px solid ${C.border2}`, background: "transparent", color: C.slate, fontSize: 12, cursor: "pointer", fontFamily: C.sans, marginBottom: 8 }}>
+              Resetar parâmetros
+            </button>
+            <button onClick={exportarCSV}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${C.indigo}, #8b5cf6)`, color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: C.sans, fontWeight: 500 }}>
+              ⬇ Exportar CSV
+            </button>
+          </div>
+        </aside>
+
+        {/* ── MAIN ── */}
+        <main style={{ padding: "24px", overflowY: "auto" }}>
+
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: C.white, letterSpacing: "-0.02em" }}>Planejamento Financeiro</h1>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.slate2 }}>Simulação patrimonial · Alto Padrão</p>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {["graficos", "sensibilidade", "tabela"].map(aba => (
+                <button key={aba} style={tabStyle(aba)} onClick={() => setAbaAtiva(aba)}>
+                  {aba === "graficos" ? "Visão Geral" : aba === "sensibilidade" ? "Sensibilidade" : "Tabela"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Executive Summary */}
+          <GlassCard style={{ marginBottom: 20, borderLeft: `3px solid ${C.indigo}`, borderRadius: "0 16px 16px 0" }}>
+            <div style={{ fontSize: 10, color: C.indigo, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 8, fontWeight: 600 }}>Executive Summary</div>
+            <p style={{ margin: 0, fontSize: 13, color: C.white2, lineHeight: 1.7 }}>{resumoExecutivo}</p>
+          </GlassCard>
+
+          {/* Cards linha 1 — resultados */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, marginBottom: 14 }}>
+            <MetricCard label="Patrimônio Real" value={fmtCpct(resumo.patrimonioAcumuladoReal)} sub="Poder de compra de hoje" accent={C.indigo} icon="📈" />
+            <MetricCard label="Renda Mensal Projetada" value={fmtBRL(resumo.rendaMensalRealInicial)} sub="Poder de compra de hoje" accent={C.emerald} icon="💰" />
+            <MetricCard label="Patrimônio Nominal" value={fmtCpct(resumo.patrimonioAcumuladoNominal)} sub="Fim da acumulação" accent={C.slate} icon="🏦" />
+          </div>
+
+          {/* Cards linha 2 — metas */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, marginBottom: 20 }}>
+            <MetricCard label="Aporte Necessário" value={aporteNecessario ? fmtBRL(aporteNecessario) : "—"} sub={`Mensal para atingir em ${p.prazoAcumulacao} anos`} accent={C.amber} icon="🎯" />
+            <MetricCard label="Tempo para Meta" value={anosCasoAtual ? `${anosCasoAtual.toFixed(1).replace(".",",")} anos` : "Não atinge"} sub="Com os parâmetros atuais" accent={C.white2} icon="⏱" />
+            <MetricCard label="Patrimônio Necessário" value={fmtCpct(patrimonioNecessario)} sub={metaAtingida ? "✓ Meta atingida no prazo" : "✗ Meta não atingida"} accent={metaAtingida ? C.emerald : C.rose} icon={metaAtingida ? "✅" : "⚠️"} />
+          </div>
+
+          {/* ABA: VISÃO GERAL */}
+          {abaAtiva === "graficos" && (
+            <div style={{ display: "grid", gap: 16 }}>
+
+              {/* Gráfico patrimônio — destaque */}
+              <GlassCard>
+                <SectionTitle>Patrimônio Real ao Longo do Tempo</SectionTitle>
+                <div style={{ height: 340 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={dados} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradP" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={C.indigo} stopOpacity={0.3} />
+                          <stop offset="100%" stopColor={C.indigo} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={fmtMi} {...chartProps.yAxis} />
+                      <Tooltip content={<CustomTooltipPatrimonio />} />
+                      <ReferenceLine x={p.prazoAcumulacao} stroke={C.slate2} strokeDasharray="4 4" label={{ value: "Usufruto", position: "insideTopRight", fill: C.slate, fontSize: 10 }} />
+                      {pico && <ReferenceLine x={pico.ano} stroke={C.emerald} strokeDasharray="3 3" label={{ value: "Pico", position: "insideTopLeft", fill: C.emerald, fontSize: 10 }} />}
+                      {resumo.anoEsgotamento && <ReferenceLine x={Math.floor(resumo.anoEsgotamento)} stroke={C.rose} strokeDasharray="3 3" label={{ value: "Esgotamento", position: "insideTopRight", fill: C.rose, fontSize: 10 }} />}
+                      <Area type="monotone" dataKey="patrimonioReal" stroke={C.indigo} strokeWidth={2} fill="url(#gradP)" dot={false} activeDot={{ r: 4, fill: C.indigo, stroke: C.bg, strokeWidth: 2 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </GlassCard>
+
+              {/* Grid 2 colunas */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+                {/* Renda mensal no usufruto */}
+                <GlassCard>
+                  <SectionTitle>Renda Mensal no Usufruto</SectionTitle>
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer>
+                      <AreaChart data={dadosRendaMensal} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={C.emerald} stopOpacity={0.3} />
+                            <stop offset="100%" stopColor={C.emerald} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid {...chartProps.cartesianGrid} />
+                        <XAxis dataKey="ano" {...chartProps.xAxis} />
+                        <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                        <Tooltip formatter={v => [fmtBRL(v), "Renda"]} {...chartProps.tooltip} />
+                        {p.rendaMensalDesejada > 0 && <ReferenceLine y={p.rendaMensalDesejada} stroke={C.indigo} strokeDasharray="4 4" label={{ value: "Meta", position: "insideTopRight", fill: C.indigo, fontSize: 10 }} />}
+                        <Area type="monotone" dataKey="rendaMensal" stroke={C.emerald} strokeWidth={2} fill="url(#gradR)" dot={false} activeDot={{ r: 4, fill: C.emerald }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
-                  {erros[campo] && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 3 }}>{erros[campo]}</div>}
-                </div>
-              ))}
-              <div>
-                <Label campo="prazoAcumulacao">Prazo de Acumulação (anos)</Label>
-                <input value={parametros.prazoAcumulacao} onChange={e => set("prazoAcumulacao", e.target.value)} style={erros.prazoAcumulacao ? S.inputErr : S.input} />
-                {erros.prazoAcumulacao && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 3 }}>{erros.prazoAcumulacao}</div>}
-              </div>
-              <div>
-                <Label campo="rendaMensalDesejada">Renda Mensal Desejada (meta)</Label>
-                <div style={{ position: "relative" }}><Pref t="R$" /><input value={parametros.rendaMensalDesejada} onChange={e => setM("rendaMensalDesejada", e.target.value)} style={{ ...S.input, paddingLeft: 42 }} /></div>
-              </div>
-            </div>
+                </GlassCard>
 
-            <div style={{ borderTop: "1px solid #eef2f7", paddingTop: 18 }}>
-              <span style={{ ...S.badge, background: "#d1fae5", color: "#047857" }}>Usufruto</span>
-              <div style={{ display: "grid", gap: 14, marginTop: 14 }}>
-                {[["Retorno Nominal", "retornoNominalUsufruto"], ["Taxa de Retirada Anual", "taxaRetiradaAnual"]].map(([lbl, campo]) => (
-                  <div key={campo}>
-                    <Label campo={campo}>{lbl}</Label>
-                    <div style={{ position: "relative" }}>
-                      <input value={parametros[campo]} onChange={e => set(campo, e.target.value)} style={{ ...(erros[campo] ? S.inputErr : S.input), paddingRight: 32 }} />
-                      <Suf t="%" />
-                    </div>
-                    {erros[campo] && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 3 }}>{erros[campo]}</div>}
+                {/* Fluxos */}
+                <GlassCard>
+                  <SectionTitle>Fluxos Anuais</SectionTitle>
+                  <div style={{ height: 220 }}>
+                    <ResponsiveContainer>
+                      <BarChart data={dadosFluxos} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid {...chartProps.cartesianGrid} />
+                        <XAxis dataKey="ano" {...chartProps.xAxis} />
+                        <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                        <Tooltip formatter={v => [fmtBRL(v)]} labelFormatter={l => `Ano ${l}`} {...chartProps.tooltip} />
+                        <ReferenceLine x={p.prazoAcumulacao} stroke={C.slate2} strokeDasharray="3 3" />
+                        <Bar dataKey="fluxo" radius={[4,4,0,0]}>
+                          {dadosFluxos.map((e, i) => <Cell key={i} fill={e.cor} fillOpacity={0.85} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
-                <div>
-                  <Label campo="prazoUsufruto">Prazo de Usufruto (anos)</Label>
-                  <input value={parametros.prazoUsufruto} onChange={e => set("prazoUsufruto", e.target.value)} style={erros.prazoUsufruto ? S.inputErr : S.input} />
-                  {erros.prazoUsufruto && <div style={{ color: "#ef4444", fontSize: 11, marginTop: 3 }}>{erros.prazoUsufruto}</div>}
-                </div>
-                <div>
-                  <Label campo="modoUsufruto">Modo de Usufruto</Label>
-                  <select value={parametros.modoUsufruto} onChange={e => set("modoUsufruto", e.target.value)} style={S.input}>
-                    <option value="fixa">Renda fixa real (mantém poder de compra)</option>
-                    <option value="variavel">Retirada percentual (acompanha patrimônio)</option>
-                  </select>
-                </div>
+                </GlassCard>
               </div>
+
+              {/* Total investido vs rendimento */}
+              <GlassCard>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div><SectionTitle>Total Investido vs Rendimento</SectionTitle></div>
+                  <div style={{ display: "flex", gap: 16 }}>
+                    {[["Total Investido", C.emerald, resumo.totalInvestido], ["Rendimento", C.indigo, resumo.rendimento]].map(([lbl, cor, val]) => (
+                      <div key={lbl} style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 10, color: C.slate, display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: cor, display: "inline-block" }} />{lbl}
+                        </div>
+                        <div style={{ fontSize: 16, color: cor, fontFamily: C.mono, fontWeight: 500 }}>{fmtCpct(val)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={dadosEmpilhado} barCategoryGap="20%" margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={v => `${v.toFixed(1)}Mi`} {...chartProps.yAxis} />
+                      <Tooltip formatter={(v, name) => [`R$ ${v.toFixed(2).replace(".",",")} mi`, name]} {...chartProps.tooltip} />
+                      <Bar dataKey="totalInvestido" name="Total Investido" stackId="a" fill={C.emerald} fillOpacity={0.8} radius={[0,0,0,0]} />
+                      <Bar dataKey="rendimento" name="Rendimento" stackId="a" fill={C.indigo} fillOpacity={0.85} radius={[4,4,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </GlassCard>
             </div>
-          </aside>
+          )}
 
-          <main style={{ display: "grid", gap: 24 }}>
-
-            {/* Linha 1 — resultados da simulação */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 16 }}>
-              {[
-                { lbl: "Patrimônio Nominal", val: fmtCpct(resumo.patrimonioAcumuladoNominal), sub: "Fim da acumulação", bg: "linear-gradient(135deg,#4338ca,#7c3aed)" },
-                { lbl: "Patrimônio Real", val: fmtCpct(resumo.patrimonioAcumuladoReal), sub: "Poder de compra hoje", bg: "linear-gradient(135deg,#059669,#14b8a6)" },
-                { lbl: "Renda Mensal Projetada", val: fmtBRL(resumo.rendaMensalRealInicial), sub: "Poder de compra hoje", bg: "linear-gradient(135deg,#0369a1,#06b6d4)" },
-              ].map(({ lbl, val, sub, bg }) => (
-                <div key={lbl} style={{ ...S.card, background: bg }}>
-                  <div style={{ fontSize: 12, opacity: 0.85 }}>{lbl}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, marginTop: 8 }}>{val}</div>
-                  <div style={{ fontSize: 11, opacity: 0.82, marginTop: 6, lineHeight: 1.4 }}>{sub}</div>
-                </div>
-              ))}
+          {/* ABA: SENSIBILIDADE */}
+          {abaAtiva === "sensibilidade" && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <SensChart title="Sensibilidade · Renda Desejada" data={sensibilidadeRenda} xKey="rendaMil" xLabel="Renda mensal (mil R$)" lineColor={C.indigo} currentX={p.rendaMensalDesejada/1000} currentY={anosCasoAtual} tipPrefix="Renda" fmtX={l => `R$${l}k`} />
+              <SensChart title="Sensibilidade · Aporte Mensal" data={sensibilidadeAporte} xKey="aporteMil" xLabel="Aporte mensal (mil R$)" lineColor={C.emerald} currentX={p.aporteMensal/1000} currentY={anosCasoAtual} tipPrefix="Aporte" fmtX={l => `R$${l}k`} />
             </div>
+          )}
 
-            {/* Linha 2 — metas e planejamento */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 16 }}>
-              <div style={{ ...S.card, background: "linear-gradient(135deg,#b45309,#d97706)" }}>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>Aporte Necessário para Meta</div>
-                <div style={{ fontSize: 22, fontWeight: 800, marginTop: 8 }}>{aporteNecessario ? fmtBRL(aporteNecessario) : "—"}</div>
-                <div style={{ fontSize: 11, opacity: 0.82, marginTop: 6 }}>Mensal para atingir em {p.prazoAcumulacao} anos</div>
-              </div>
-              <div style={{ ...S.card, background: "linear-gradient(135deg,#111827,#334155)" }}>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>Tempo para Meta</div>
-                <div style={{ fontSize: 22, fontWeight: 800, marginTop: 8 }}>{anosCasoAtual ? `${anosCasoAtual.toFixed(1).replace(".",",")} anos` : "Não atinge"}</div>
-                <div style={{ fontSize: 11, opacity: 0.82, marginTop: 6 }}>Com os parâmetros atuais</div>
-              </div>
-              <div style={{ ...S.card, background: metaAtingida ? "linear-gradient(135deg,#15803d,#16a34a)" : "linear-gradient(135deg,#b91c1c,#dc2626)" }}>
-                <div style={{ fontSize: 12, opacity: 0.85 }}>Patrimônio Necessário</div>
-                <div style={{ fontSize: 22, fontWeight: 800, marginTop: 8 }}>{fmtCpct(patrimonioNecessario)}</div>
-                <div style={{ fontSize: 11, opacity: 0.82, marginTop: 6 }}>{metaAtingida ? "✓ Meta atingida no prazo" : "✗ Meta não atingida no prazo"}</div>
-              </div>
-            </div>
-
-            <section style={{ ...S.section, background: "linear-gradient(135deg,#f0f4ff,#fafafa)", border: "1px solid #c7d2fe" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,#4f46e5,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>📋</div>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#1e1b4b" }}>Resumo Executivo</h3>
-              </div>
-              <p style={{ margin: 0, fontSize: 15, color: "#334155", lineHeight: 1.8 }}>{resumoExecutivo}</p>
-            </section>
-
-            <section style={S.section}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Patrimônio Real ao Longo do Tempo</h3>
-                <div style={{ padding: "6px 12px", borderRadius: 999, background: "#f1f5f9", fontSize: 12, fontWeight: 600, color: "#475569" }}>Acumulação → Usufruto</div>
-              </div>
-              <div style={S.chart}><div style={{ width: "100%", height: 380 }}>
-                <ResponsiveContainer>
-                  <AreaChart data={dados}>
-                    <defs>
-                      <linearGradient id="fillP" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.04} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="4 6" vertical={false} stroke="#dbe4f0" />
-                    <XAxis dataKey="ano" tick={{ fill: "#64748b", fontSize: 12 }} />
-                    <YAxis tickFormatter={fmtMi} tick={{ fill: "#64748b", fontSize: 12 }} width={90} />
-                    <Tooltip content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload;
-                      return <TipBox itens={[["Ano", d.ano], ["Fase", d.fase], ["Patrimônio real", fmtBRL(d.patrimonioReal)], ["Renda mensal", fmtBRL(d.rendaMensalReal)], ["Resgate anual", fmtBRL(d.resgateAnualReal)]]} />;
-                    }} />
-                    <ReferenceLine x={p.prazoAcumulacao} stroke="#0f172a" strokeDasharray="6 6" label={{ value: "Início do usufruto", position: "insideTopRight", fill: "#0f172a", fontSize: 12 }} />
-                    {pico && <ReferenceLine x={pico.ano} stroke="#16a34a" strokeDasharray="4 4" label={{ value: "Pico", position: "insideTopLeft", fill: "#16a34a", fontSize: 12 }} />}
-                    {resumo.anoEsgotamento && <ReferenceLine x={Math.floor(resumo.anoEsgotamento)} stroke="#ef4444" strokeDasharray="4 4" label={{ value: "Esgotamento", position: "insideTopRight", fill: "#ef4444", fontSize: 12 }} />}
-                    <Area type="monotone" dataKey="patrimonioReal" stroke="#6366f1" strokeWidth={4} fill="url(#fillP)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div></div>
-            </section>
-
-            <section style={S.section}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Renda Mensal ao Longo do Usufruto</h3>
-                <div style={{ padding: "6px 12px", borderRadius: 999, background: "#f1f5f9", fontSize: 12, fontWeight: 600, color: "#475569" }}>Poder de compra de hoje</div>
-              </div>
-              <div style={S.chart}><div style={{ width: "100%", height: 280 }}>
-                <ResponsiveContainer>
-                  <AreaChart data={dadosRendaMensal}>
-                    <defs>
-                      <linearGradient id="fillRenda" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor="#059669" stopOpacity={0.35} />
-                        <stop offset="95%" stopColor="#059669" stopOpacity={0.04} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="4 6" vertical={false} stroke="#dbe4f0" />
-                    <XAxis dataKey="ano" tick={{ fill: "#64748b", fontSize: 12 }} />
-                    <YAxis tickFormatter={v => `R$${Math.round(v/1000)}k`} tick={{ fill: "#64748b", fontSize: 12 }} width={80} />
-                    <Tooltip content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload;
-                      return <TipBox itens={[["Ano", d.ano], ["Renda mensal real", fmtBRL(d.rendaMensal)]]} />;
-                    }} />
-                    {p.rendaMensalDesejada > 0 && <ReferenceLine y={p.rendaMensalDesejada} stroke="#6366f1" strokeDasharray="5 5" label={{ value: `Meta: ${fmtBRL(p.rendaMensalDesejada)}`, position: "insideTopRight", fill: "#6366f1", fontSize: 11 }} />}
-                    <Area type="monotone" dataKey="rendaMensal" stroke="#059669" strokeWidth={3} fill="url(#fillRenda)" dot={false} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div></div>
-            </section>
-
-            <section style={S.section}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Total Investido vs Rendimento</h3>
-                <div style={{ padding: "6px 12px", borderRadius: 999, background: "#f1f5f9", fontSize: 12, fontWeight: 600, color: "#475569" }}>Fase de acumulação</div>
-              </div>
-              {/* Mini cards acima do gráfico */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                <div style={{ ...S.card, background: "linear-gradient(135deg,#0f766e,#0d9488)", minHeight: 90, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 12, opacity: 0.85 }}>Total Investido</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, marginTop: 6 }}>{fmtCpct(resumo.totalInvestido)}</div>
-                  <div style={{ fontSize: 11, opacity: 0.82, marginTop: 4 }}>Capital aportado nominal</div>
-                </div>
-                <div style={{ ...S.card, background: "linear-gradient(135deg,#7c3aed,#a855f7)", minHeight: 90, padding: "16px 18px" }}>
-                  <div style={{ fontSize: 12, opacity: 0.85 }}>Rendimento Gerado</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, marginTop: 6 }}>{fmtCpct(resumo.rendimento)}</div>
-                  <div style={{ fontSize: 11, opacity: 0.82, marginTop: 4 }}>Juros sobre capital nominal</div>
-                </div>
-              </div>
-              <div style={S.chart}><div style={{ width: "100%", height: 280 }}>
-                <ResponsiveContainer>
-                  <BarChart data={dadosEmpilhado}>
-                    <CartesianGrid strokeDasharray="4 6" vertical={false} stroke="#dbe4f0" />
-                    <XAxis dataKey="ano" tick={{ fill: "#64748b", fontSize: 12 }} />
-                    <YAxis tickFormatter={v => `R$${v.toFixed(1)}mi`} tick={{ fill: "#64748b", fontSize: 12 }} width={80} />
-                    <Tooltip formatter={(v, name) => [`R$ ${v.toFixed(2).replace(".",",")} mi`, name]} contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10 }} />
-                    <Legend />
-                    <Bar dataKey="totalInvestido" name="Total Investido" stackId="a" fill="#14b8a6" radius={[0,0,0,0]} />
-                    <Bar dataKey="rendimento" name="Rendimento" stackId="a" fill="#6366f1" radius={[6,6,0,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div></div>
-            </section>
-
-            <section style={S.section}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>Fluxos Anuais da Estratégia</h3>
-                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", fontWeight: 600 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: "#16a34a", display: "inline-block" }} />Entradas</span>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#475569", fontWeight: 600 }}><span style={{ width: 14, height: 14, borderRadius: 3, background: "#2563eb", display: "inline-block" }} />Saídas</span>
-                </div>
-              </div>
-              <div style={S.chart}><div style={{ width: "100%", height: 300 }}>
-                <ResponsiveContainer>
-                  <BarChart data={dadosFluxos} barCategoryGap="20%">
-                    <CartesianGrid strokeDasharray="4 6" vertical={false} stroke="#dbe4f0" />
-                    <XAxis dataKey="ano" tick={{ fill: "#64748b", fontSize: 12 }} />
-                    <YAxis tickFormatter={v => `R$${Math.round(v/1000)}k`} tick={{ fill: "#64748b", fontSize: 12 }} width={75} />
-                    <Tooltip content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const d = payload[0].payload;
-                      return <TipBox itens={[["Ano", d.ano], ["Fase", d.fase], [d.fase === "Acumulação" ? "Entrada anual" : "Saída anual", fmtBRL(d.fluxo)]]} />;
-                    }} />
-                    <ReferenceLine x={p.prazoAcumulacao} stroke="#0f172a" strokeDasharray="6 6" label={{ value: "Início usufruto", position: "insideTopRight", fill: "#0f172a", fontSize: 11 }} />
-                    <Bar dataKey="fluxo" radius={[8,8,0,0]}>
-                      {dadosFluxos.map((entry, index) => <Cell key={index} fill={entry.cor} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div></div>
-            </section>
-
-            <SensChart title="Variação da Renda Desejada" subtitle="Prazo para atingir a meta com diferentes rendas mensais desejadas." data={sensibilidadeRenda} xKey="rendaMil" xLabel="Renda mensal (mil R$)" lineColor="#6366f1" currentX={p.rendaMensalDesejada/1000} currentY={anosCasoAtual} tipPrefix="Renda" fmtX={l => `R$${l}k`} />
-            <SensChart title="Variação do Aporte" subtitle="Prazo para atingir a meta com diferentes aportes mensais." data={sensibilidadeAporte} xKey="aporteMil" xLabel="Aporte mensal (mil R$)" lineColor="#14b8a6" currentX={p.aporteMensal/1000} currentY={anosCasoAtual} tipPrefix="Aporte" fmtX={l => `R$${l}k`} />
-            <SensChart title="Variação do Patrimônio Inicial" subtitle="Prazo para atingir a meta com diferentes patrimônios iniciais." data={sensibilidadePat} xKey="patrimonioMil" xLabel="Patrimônio inicial (mil R$)" lineColor="#8b5cf6" currentX={p.patrimonioInicial/1000} currentY={anosCasoAtual} tipPrefix="Patrimônio" fmtX={l => `R$${fmtInt(l)}k`} />
-
-            <section style={S.section}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-                <h3 style={{ fontSize: 22, margin: 0, fontWeight: 800 }}>Tabela da Simulação</h3>
-                <button onClick={exportarCSV} style={{ padding: "10px 20px", borderRadius: 12, border: "1px solid #dbe2ea", background: "#f8fafc", cursor: "pointer", fontSize: 13, color: "#475569", fontWeight: 600 }}>⬇ Exportar CSV</button>
-              </div>
-              <div style={{ overflowX: "auto", maxHeight: 420, border: "1px solid #e2e8f0", borderRadius: 12, background: "#fff" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }}>
-                  <thead><tr>{["Ano","Fase","Patrimônio Nominal","Patrimônio Real","Resgate Anual Real","Renda Mensal Real"].map(h => <th key={h} style={S.th}>{h}</th>)}</tr></thead>
+          {/* ABA: TABELA */}
+          {abaAtiva === "tabela" && (
+            <GlassCard>
+              <SectionTitle>Tabela da Simulação</SectionTitle>
+              <div style={{ overflowX: "auto", maxHeight: 520 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+                  <thead>
+                    <tr>{["Ano","Fase","Patrimônio Nominal","Patrimônio Real","Resgate Anual Real","Renda Mensal Real"].map(h => (
+                      <th key={h} style={{ padding: "10px 12px", textAlign: "left", borderBottom: `1px solid ${C.border}`, fontSize: 11, color: C.slate, fontWeight: 500, fontFamily: C.sans, textTransform: "uppercase", letterSpacing: "0.06em", position: "sticky", top: 0, background: C.surface }}>{h}</th>
+                    ))}</tr>
+                  </thead>
                   <tbody>
                     {dados.map((d, i) => (
-                      <tr key={i} style={{ background: d.ano === p.prazoAcumulacao ? "#fffbeb" : "transparent" }}>
-                        <td style={S.td}>{d.ano}</td>
-                        <td style={S.td}><span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700, background: d.fase === "Acumulação" ? "#e0e7ff" : "#d1fae5", color: d.fase === "Acumulação" ? "#4338ca" : "#047857" }}>{d.fase}</span></td>
-                        <td style={S.td}>{fmtBRL(d.patrimonioNominal)}</td>
-                        <td style={S.td}>{fmtBRL(d.patrimonioReal)}</td>
-                        <td style={S.td}>{fmtBRL(d.resgateAnualReal)}</td>
-                        <td style={S.td}>{fmtBRL(d.rendaMensalReal)}</td>
+                      <tr key={i} style={{ background: d.ano === p.prazoAcumulacao ? "rgba(99,102,241,0.08)" : "transparent" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+                        onMouseLeave={e => e.currentTarget.style.background = d.ano === p.prazoAcumulacao ? "rgba(99,102,241,0.08)" : "transparent"}>
+                        <td style={{ padding: "9px 12px", fontSize: 12, color: C.slate, fontFamily: C.mono, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{d.ano}</td>
+                        <td style={{ padding: "9px 12px", borderBottom: `1px solid rgba(255,255,255,0.04)` }}>
+                          <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 500, fontFamily: C.sans, background: d.fase === "Acumulação" ? "rgba(99,102,241,0.2)" : "rgba(16,185,129,0.2)", color: d.fase === "Acumulação" ? C.indigo : C.emerald }}>{d.fase}</span>
+                        </td>
+                        {[d.patrimonioNominal, d.patrimonioReal, d.resgateAnualReal, d.rendaMensalReal].map((v, j) => (
+                          <td key={j} style={{ padding: "9px 12px", fontSize: 12, color: C.white2, fontFamily: C.mono, borderBottom: `1px solid rgba(255,255,255,0.04)` }}>{fmtBRL(v)}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </section>
-
-          </main>
-        </div>
+            </GlassCard>
+          )}
+        </main>
       </div>
     </div>
   );
