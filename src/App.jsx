@@ -968,16 +968,19 @@ export default function App() {
                   const retRealUsu = ((1 + p.retornoNominalUsufruto) / (1 + p.inflacao) - 1) * 100;
                   const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 
-                  const tabelaRows = dados.slice(0, 40).map(d => `
-                    <tr style="background:${d.ano === p.prazoAcumulacao ? "rgba(99,102,241,0.15)" : d.ano % 2 === 0 ? "#1a2332" : "#1e293b"}">
-                      <td>${d.ano}</td>
-                      <td>${p.idadeAtual + d.ano}</td>
-                      <td><span style="color:${d.fase==="Acumulação"?"#6366f1":"#10b981"}">${d.fase}</span></td>
-                      <td>${fmtB(d.patrimonioNominal)}</td>
-                      <td>${fmtB(d.patrimonioReal)}</td>
-                      <td>${d.aporteAnualNominal > 0 ? fmtB(d.aporteAnualNominal) : "—"}</td>
-                      <td>${d.resgateAnualNominal > 0 ? fmtB(d.resgateAnualNominal) : "—"}</td>
-                      <td>${d.resgateNominalMensal > 0 ? fmtB(d.resgateNominalMensal) : "—"}</td>
+                  const tabelaRows = dados.map(d => `
+                    <tr style="background:${d.ano === p.prazoAcumulacao ? "rgba(99,102,241,0.12)" : d.ano % 2 === 0 ? "#1a2332" : "#1e293b"}">
+                      <td style="color:#94a3b8">${d.ano}</td>
+                      <td style="color:#e2e8f0">${p.idadeAtual + d.ano}</td>
+                      <td><span style="padding:2px 7px;border-radius:999px;font-size:10px;background:${d.fase==="Acumulação"?"rgba(99,102,241,0.2)":"rgba(16,185,129,0.2)"};color:${d.fase==="Acumulação"?"#6366f1":"#10b981"}">${d.fase}</span></td>
+                      <td style="color:#f59e0b">${fmtB(d.patrimonioNominal)}</td>
+                      <td style="color:#6366f1">${fmtB(d.patrimonioReal)}</td>
+                      <td style="color:${d.aporteAnualNominal>0?"#f59e0b":"#475569"}">${d.aporteAnualNominal > 0 ? fmtB(d.aporteAnualNominal) : "—"}</td>
+                      <td style="color:${d.aporteAnualReal>0?"#10b981":"#475569"}">${d.aporteAnualReal > 0 ? fmtB(d.aporteAnualReal) : "—"}</td>
+                      <td style="color:${d.resgateAnualNominal>0?"#f59e0b":"#475569"}">${d.resgateAnualNominal > 0 ? fmtB(d.resgateAnualNominal) : "—"}</td>
+                      <td style="color:${d.resgateAnualReal>0?"#10b981":"#475569"}">${d.resgateAnualReal > 0 ? fmtB(d.resgateAnualReal) : "—"}</td>
+                      <td style="color:${d.resgateNominalMensal>0?"#f59e0b":"#475569"}">${d.resgateNominalMensal > 0 ? fmtB(d.resgateNominalMensal) : "—"}</td>
+                      <td style="color:${d.rendaMensalReal>0?"#10b981":"#475569"}">${d.rendaMensalReal > 0 ? fmtB(d.rendaMensalReal) : "—"}</td>
                     </tr>`).join("");
 
                   const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
@@ -1013,10 +1016,11 @@ export default function App() {
                     .resumo-box .ok{color:#10b981;font-weight:700;font-family:'JetBrains Mono',monospace}
                     .resumo-box .warn{color:#f43f5e;font-weight:700;font-family:'JetBrains Mono',monospace}
                     .resumo-box .amber{color:#f59e0b;font-weight:700;font-family:'JetBrains Mono',monospace}
-                    table{width:100%;border-collapse:collapse;font-size:11px}
-                    th{padding:9px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1);font-size:10px;color:#94a3b8;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;background:#1e293b}
-                    td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'JetBrains Mono',monospace}
+                    table{width:100%;border-collapse:collapse;font-size:10px}
+                    th{padding:7px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1);font-size:9px;color:#94a3b8;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;background:#1e293b;white-space:nowrap}
+                    td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'JetBrains Mono',monospace;white-space:nowrap}
                     td:nth-child(n+4){text-align:right}
+                    th:nth-child(n+4){text-align:right}
                     .table-wrap{border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;margin-bottom:32px}
                     .footer{text-align:center;font-size:11px;color:#475569;padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);margin-top:16px}
                     @media print{body{padding:20px}}
@@ -1074,35 +1078,164 @@ export default function App() {
                   </div>
 
                   <div class="section-title">Parâmetros da Simulação</div>
-                  <div class="params-grid">
-                    <div class="param"><span class="plbl">Idade Atual</span><span class="pval">${p.idadeAtual} anos</span></div>
-                    <div class="param"><span class="plbl">Idade de Aposentadoria</span><span class="pval">${p.idadeAposentadoria} anos</span></div>
-                    <div class="param"><span class="plbl">Prazo de Acumulação</span><span class="pval">${p.prazoAcumulacao} anos</span></div>
-                    <div class="param"><span class="plbl">Prazo de Usufruto</span><span class="pval">${p.prazoUsufruto} anos</span></div>
-                    <div class="param"><span class="plbl">Patrimônio Inicial</span><span class="pval">${fmtC(p.patrimonioInicial)}</span></div>
-                    <div class="param"><span class="plbl">Aporte Mensal</span><span class="pval">${fmtC(p.aporteMensal)}</span></div>
-                    <div class="param"><span class="plbl">Retorno Nominal (Acumulação)</span><span class="pval">${(p.retornoNominalAcumulacao * 100).toFixed(1).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Retorno Real (Acumulação)</span><span class="pval" style="color:#10b981">${retRealAcc >= 0 ? "+" : ""}${retRealAcc.toFixed(2).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Retorno Nominal (Usufruto)</span><span class="pval">${(p.retornoNominalUsufruto * 100).toFixed(1).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Retorno Real (Usufruto)</span><span class="pval" style="color:#10b981">${retRealUsu >= 0 ? "+" : ""}${retRealUsu.toFixed(2).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Inflação</span><span class="pval">${(p.inflacao * 100).toFixed(1).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Taxa de Retirada Anual</span><span class="pval">${(p.taxaRetiradaAnual * 100).toFixed(1).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Crescimento do Aporte</span><span class="pval">${(p.crescimentoAporteAnual * 100).toFixed(1).replace(".",",")}%</span></div>
-                    <div class="param"><span class="plbl">Renda Mensal Desejada</span><span class="pval">${fmtC(p.rendaMensalDesejada)}</span></div>
-                    <div class="param"><span class="plbl">Modo de Usufruto</span><span class="pval">${p.modoUsufruto === "fixa" ? "Renda Fixa Real" : "Retirada Percentual"}</span></div>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:32px">
+
+                    <!-- Coluna 1: Prazos e idades -->
+                    <div>
+                      <div style="font-size:10px;color:#6366f1;text-transform:uppercase;letter-spacing:0.1em;font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(99,102,241,0.3)">Perfil</div>
+                      ${[
+                        ["Idade Atual", `${p.idadeAtual} anos`],
+                        ["Idade Aposentadoria", `${p.idadeAposentadoria} anos`],
+                        ["Prazo de Acumulação", `${p.prazoAcumulacao} anos`],
+                        ["Prazo de Usufruto", `${p.prazoUsufruto} anos`],
+                      ].map(([l,v]) => `<div class="param" style="margin-bottom:6px"><span class="plbl">${l}</span><span class="pval">${v}</span></div>`).join("")}
+                    </div>
+
+                    <!-- Coluna 2: Aportes e renda -->
+                    <div>
+                      <div style="font-size:10px;color:#10b981;text-transform:uppercase;letter-spacing:0.1em;font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(16,185,129,0.3)">Aportes & Renda</div>
+                      ${[
+                        ["Aporte Mensal", fmtC(p.aporteMensal)],
+                        ["Crescimento do Aporte", `${(p.crescimentoAporteAnual*100).toFixed(1).replace(".",",")}% a.a.`],
+                        ["Renda Mensal Desejada", fmtC(p.rendaMensalDesejada)],
+                        ["Inflação Projetada", `${(p.inflacao*100).toFixed(1).replace(".",",")}% a.a.`],
+                      ].map(([l,v]) => `<div class="param" style="margin-bottom:6px"><span class="plbl">${l}</span><span class="pval">${v}</span></div>`).join("")}
+                    </div>
+
+                    <!-- Coluna 3: Retornos -->
+                    <div>
+                      <div style="font-size:10px;color:#f59e0b;text-transform:uppercase;letter-spacing:0.1em;font-weight:600;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(245,158,11,0.3)">Retornos Projetados</div>
+                      ${[
+                        ["Retorno Nominal (Acumulação)", `${(p.retornoNominalAcumulacao*100).toFixed(1).replace(".",",")}%`],
+                        ["Retorno Real (Acumulação)", `${retRealAcc>=0?"+":""}${retRealAcc.toFixed(2).replace(".",",")}%`, "#10b981"],
+                        ["Retorno Nominal (Usufruto)", `${(p.retornoNominalUsufruto*100).toFixed(1).replace(".",",")}%`],
+                        ["Retorno Real (Usufruto)", `${retRealUsu>=0?"+":""}${retRealUsu.toFixed(2).replace(".",",")}%`, "#10b981"],
+                      ].map(([l,v,c]) => `<div class="param" style="margin-bottom:6px"><span class="plbl">${l}</span><span class="pval" style="color:${c||"#f8fafc"}">${v}</span></div>`).join("")}
+                    </div>
                   </div>
+
+                  <!-- GRÁFICOS -->
+                  <div class="section-title">Análise Gráfica</div>
+
+                  <!-- Gráfico 1: Patrimônio Real ao longo do tempo -->
+                  <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:16px">
+                    <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Patrimônio Real ao Longo do Tempo</div>
+                    <div style="font-size:10px;color:#64748b;margin-bottom:16px">Poder de compra de hoje · R$ Mi</div>
+                    <canvas id="chart1" height="120"></canvas>
+                  </div>
+
+                  <!-- Grid 2 colunas para os outros 3 gráficos -->
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+                    <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px">
+                      <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Renda Mensal no Usufruto</div>
+                      <div style="font-size:10px;color:#64748b;margin-bottom:16px">Real · poder de compra hoje</div>
+                      <canvas id="chart2" height="160"></canvas>
+                    </div>
+                    <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px">
+                      <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Fluxos Anuais</div>
+                      <div style="font-size:10px;color:#64748b;margin-bottom:16px">Aportes e resgates reais</div>
+                      <canvas id="chart3" height="160"></canvas>
+                    </div>
+                  </div>
+                  <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:32px">
+                    <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Total Investido vs Rendimento</div>
+                    <div style="font-size:10px;color:#64748b;margin-bottom:16px">Fase de acumulação · R$ Mi</div>
+                    <canvas id="chart4" height="100"></canvas>
+                  </div>
+
+                  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+                  <script>
+                    Chart.defaults.color = '#64748b';
+                    Chart.defaults.borderColor = 'rgba(148,163,184,0.08)';
+                    const dados = ${JSON.stringify(dados.map(d => ({ ano: d.ano, fase: d.fase, pat: d.patrimonioReal, renda: d.rendaMensalReal, fluxoReal: d.fase==="Acumulação" ? d.aporteAnualReal : d.resgateAnualReal, aporte: d.totalInvestido/1e6, rend: d.rendimento/1e6 })))};
+                    const acc = dados.filter(d=>d.fase==="Acumulação");
+                    const usu = dados.filter(d=>d.fase==="Usufruto");
+                    const todos = dados;
+
+                    // Chart 1 — Patrimônio Real
+                    new Chart(document.getElementById('chart1'), {
+                      type:'line', data:{
+                        labels: todos.map(d=>d.ano),
+                        datasets:[{ data: todos.map(d=>+(d.pat/1e6).toFixed(2)), fill:true,
+                          borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.15)',
+                          borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.4 }]
+                      }, options:{ responsive:true, maintainAspectRatio:false,
+                        plugins:{ legend:{display:false} },
+                        scales:{ x:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{maxTicksLimit:12,font:{size:10}}},
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'Mi'}} } }
+                    });
+
+                    // Chart 2 — Renda Mensal Real
+                    new Chart(document.getElementById('chart2'), {
+                      type:'line', data:{
+                        labels: usu.map(d=>d.ano),
+                        datasets:[{ data: usu.map(d=>+(d.renda/1000).toFixed(1)), fill:true,
+                          borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.15)',
+                          borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.4 }]
+                      }, options:{ responsive:true, maintainAspectRatio:false,
+                        plugins:{ legend:{display:false} },
+                        scales:{ x:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{maxTicksLimit:10,font:{size:10}}},
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'k'}} } }
+                    });
+
+                    // Chart 3 — Fluxos Anuais
+                    const fluxoDados = todos.filter(d=>d.ano>0);
+                    new Chart(document.getElementById('chart3'), {
+                      type:'bar', data:{
+                        labels: fluxoDados.map(d=>d.ano),
+                        datasets:[{ data: fluxoDados.map(d=>+(d.fluxoReal/1000).toFixed(1)),
+                          backgroundColor: fluxoDados.map(d=>d.fase==="Acumulação"?"rgba(16,185,129,0.75)":"rgba(244,63,94,0.75)"),
+                          borderRadius:3, borderSkipped:false }]
+                      }, options:{ responsive:true, maintainAspectRatio:false,
+                        plugins:{ legend:{display:false} },
+                        scales:{ x:{grid:{display:false},ticks:{maxTicksLimit:10,font:{size:10}}},
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'k'}} } }
+                    });
+
+                    // Chart 4 — Total Investido vs Rendimento
+                    new Chart(document.getElementById('chart4'), {
+                      type:'bar', data:{
+                        labels: acc.map(d=>d.ano),
+                        datasets:[
+                          { label:'Total Investido', data: acc.map(d=>+d.aporte.toFixed(2)), backgroundColor:'rgba(16,185,129,0.75)', stack:'a', borderRadius:0 },
+                          { label:'Rendimento', data: acc.map(d=>+d.rend.toFixed(2)), backgroundColor:'rgba(99,102,241,0.85)', stack:'a', borderRadius:3 }
+                        ]
+                      }, options:{ responsive:true, maintainAspectRatio:false,
+                        plugins:{ legend:{ display:true, position:'top', labels:{color:'#94a3b8',font:{size:10},boxWidth:10,boxHeight:10} } },
+                        scales:{ x:{grid:{display:false},ticks:{maxTicksLimit:12,font:{size:10}}},
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'Mi'}} } }
+                    });
+                  </script>
 
                   <div class="section-title">Evolução Patrimonial — Fluxo Anual</div>
                   <div class="table-wrap">
-                    <table>
-                      <thead><tr>
-                        <th>Ano</th><th>Idade</th><th>Fase</th>
-                        <th>Patrimônio Nominal</th><th>Patrimônio Real</th>
-                        <th>Aporte Anual</th><th>Resgate Anual</th><th>Resgate Mensal</th>
-                      </tr></thead>
+                    <table style="font-size:10px">
+                      <thead>
+                        <!-- Linha de grupos -->
+                        <tr>
+                          <th colspan="3" style="background:#1e293b;border-bottom:none"></th>
+                          <th colspan="2" style="text-align:center;background:rgba(99,102,241,0.15);color:#6366f1;border-bottom:1px solid rgba(99,102,241,0.3);letter-spacing:0.1em">PATRIMÔNIO</th>
+                          <th colspan="2" style="text-align:center;background:rgba(245,158,11,0.1);color:#f59e0b;border-bottom:1px solid rgba(245,158,11,0.3);letter-spacing:0.1em">APORTE ANUAL</th>
+                          <th colspan="2" style="text-align:center;background:rgba(244,63,94,0.1);color:#f43f5e;border-bottom:1px solid rgba(244,63,94,0.3);letter-spacing:0.1em">RESGATE ANUAL</th>
+                          <th colspan="2" style="text-align:center;background:rgba(16,185,129,0.1);color:#10b981;border-bottom:1px solid rgba(16,185,129,0.3);letter-spacing:0.1em">RESGATE MENSAL</th>
+                        </tr>
+                        <!-- Linha de sub-colunas -->
+                        <tr>
+                          <th style="width:36px">Ano</th>
+                          <th style="width:44px">Idade</th>
+                          <th>Fase</th>
+                          <th style="background:rgba(245,158,11,0.06);color:#f59e0b">Nominal</th>
+                          <th style="background:rgba(99,102,241,0.06);color:#6366f1">Real</th>
+                          <th style="background:rgba(245,158,11,0.06);color:#f59e0b">Nominal</th>
+                          <th style="background:rgba(16,185,129,0.06);color:#10b981">Real</th>
+                          <th style="background:rgba(245,158,11,0.06);color:#f59e0b">Nominal</th>
+                          <th style="background:rgba(16,185,129,0.06);color:#10b981">Real</th>
+                          <th style="background:rgba(245,158,11,0.06);color:#f59e0b">Nominal</th>
+                          <th style="background:rgba(16,185,129,0.06);color:#10b981">Real</th>
+                        </tr>
+                      </thead>
                       <tbody>${tabelaRows}</tbody>
                     </table>
-                    ${dados.length > 40 ? `<div style="text-align:center;padding:10px;font-size:11px;color:#64748b">Exibindo os primeiros 40 anos de ${dados.length - 1} anos totais</div>` : ""}
                   </div>
 
                   <div class="footer">
