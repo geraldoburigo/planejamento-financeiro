@@ -1121,26 +1121,26 @@ export default function App() {
                   <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:16px">
                     <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Patrimônio Real ao Longo do Tempo</div>
                     <div style="font-size:10px;color:#64748b;margin-bottom:16px">Poder de compra de hoje · R$ Mi</div>
-                    <div style="position:relative;width:100%;height:200px"><canvas id="chart1"></canvas></div>
+                    <div style="position:relative;width:100%;height:400px"><canvas id="chart1"></canvas></div>
                   </div>
 
-                  <!-- Grid 2 colunas para os outros 3 gráficos -->
+                  <!-- Grid 2 colunas para os outros 2 gráficos -->
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
                     <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px">
                       <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Renda Mensal no Usufruto</div>
                       <div style="font-size:10px;color:#64748b;margin-bottom:16px">Real · poder de compra hoje</div>
-                      <div style="position:relative;width:100%;height:200px"><canvas id="chart2"></canvas></div>
+                      <div style="position:relative;width:100%;height:400px"><canvas id="chart2"></canvas></div>
                     </div>
                     <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px">
                       <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Fluxos Anuais</div>
                       <div style="font-size:10px;color:#64748b;margin-bottom:16px">Aportes e resgates reais</div>
-                      <div style="position:relative;width:100%;height:200px"><canvas id="chart3"></canvas></div>
+                      <div style="position:relative;width:100%;height:400px"><canvas id="chart3"></canvas></div>
                     </div>
                   </div>
                   <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:32px">
                     <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Total Investido vs Rendimento</div>
                     <div style="font-size:10px;color:#64748b;margin-bottom:16px">Fase de acumulação · R$ Mi</div>
-                    <div style="position:relative;width:100%;height:200px"><canvas id="chart4"></canvas></div>
+                    <div style="position:relative;width:100%;height:400px"><canvas id="chart4"></canvas></div>
                   </div>
 
                   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
