@@ -115,6 +115,7 @@ export default function App() {
   const [accOpen, setAccOpen] = useState(true);
   const [usuOpen, setUsuOpen] = useState(true);
   const [abaAtiva, setAbaAtiva] = useState("graficos");
+  const [modoApp, setModoApp] = useState("acumulacao"); // "acumulacao" | "usufruto"
   const [tooltipAtivo, setTooltipAtivo] = useState(null);
   const [modoTabela, setModoTabela] = useState("nominal");
   const [modoGraficos, setModoGraficos] = useState("nominal");
@@ -125,6 +126,17 @@ export default function App() {
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const sidebarRef = useRef(null);
   const relatorioRef = useRef(null);
+
+  // Parâmetros do modo usufruto puro
+  const [pu, setPu] = useState({
+    patrimonio: "3.000.000,00",
+    retornoNominal: "10",
+    inflacao: "6",
+    prazo: "30",
+    idadeAtual: "60",
+    taxaRetirada: "4",
+    modoUsufruto: "fixa",
+  });
 
   useEffect(() => {
     try { localStorage.setItem("pf-v3", JSON.stringify(parametros)); } catch {}
@@ -249,6 +261,66 @@ export default function App() {
     };
   }, [p, resumo, anosCasoAtual, dados, patrimonioNecessarioReal, patrimonioNecessarioNominal]);
 
+  // ── MODO USUFRUTO PURO — 3 cenários ─────────────────────────────────────
+  const cenariosUsufruto = useMemo(() => {
+    const pat0      = limparMoeda(pu.patrimonio);
+    const retNom    = (parseFloat(pu.retornoNominal) || 0) / 100;
+    const infl      = (parseFloat(pu.inflacao) || 0) / 100;
+    const prazo     = parseInt(pu.prazo) || 30;
+    const taxaAnual = (parseFloat(pu.taxaRetirada) || 4) / 100;
+    const modo      = pu.modoUsufruto || "fixa";
+    const txMesNom  = Math.pow(1 + retNom, 1/12) - 1;
+    const txInflMes = Math.pow(1 + infl, 1/12) - 1;
+    const txRealMes = (1 + txMesNom) / (1 + txInflMes) - 1;
+    const meses     = prazo * 12;
+
+    // Renda mensal real inicial com base na taxa de retirada
+    const rendaMensalReal = pat0 * taxaAnual / 12;
+
+    // Simula evolução: nominal e real, retirada nominal e real
+    const simular = () => {
+      const pts = [{ ano: 0, patNominal: pat0, patReal: pat0, retirNominal: 0, retirReal: 0, retirNomMensal: 0, retirRealMensal: 0 }];
+      let patNominal = pat0, fatorInfl = 1, rendaReal = rendaMensalReal;
+      let retirAcumNom = 0, retirAcumReal = 0;
+
+      for (let mes = 1; mes <= meses; mes++) {
+        if (patNominal <= 0) { fatorInfl *= 1 + txInflMes; if (mes % 12 === 0) pts.push({ ano: mes/12, patNominal: 0, patReal: 0, retirNominal: 0, retirReal: 0, retirNomMensal: 0, retirRealMensal: 0 }); continue; }
+        const rendimento = patNominal * txMesNom;
+        let retiradaNom;
+        if (modo === "fixa") {
+          retiradaNom = rendaReal * fatorInfl;
+        } else {
+          retiradaNom = patNominal * taxaAnual / 12;
+          rendaReal = retiradaNom / fatorInfl;
+        }
+        patNominal = patNominal + rendimento - retiradaNom;
+        if (patNominal < 0) patNominal = 0;
+        fatorInfl *= 1 + txInflMes;
+        const patReal = patNominal / fatorInfl;
+        retirAcumNom  += retiradaNom;
+        retirAcumReal += retiradaNom / fatorInfl;
+
+        if (mes % 12 === 0) {
+          pts.push({
+            ano: mes/12,
+            patNominal, patReal,
+            retirNominal: retirAcumNom, retirReal: retirAcumReal,
+            retirNomMensal: retirAcumNom / 12, retirRealMensal: retirAcumReal / 12,
+          });
+          retirAcumNom = 0; retirAcumReal = 0;
+        }
+      }
+      return pts;
+    };
+
+    const pontos = simular();
+    const ultimo = pontos[pontos.length - 1];
+    const retNominalPct = (retNom * 100).toFixed(1).replace(".",",");
+    const retRealPct = (((1 + retNom) / (1 + infl) - 1) * 100).toFixed(2).replace(".",",");
+
+    return { pat0, prazo, rendaMensalReal, pontos, ultimo, retNominalPct, retRealPct, taxaAnual };
+  }, [pu]);
+
   const setP = (campo, valor) => setParametros(prev => ({ ...prev, [campo]: valor }));
 
   const fmtBRL = v => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v || 0);
@@ -348,16 +420,162 @@ export default function App() {
         {/* ── SIDEBAR ── */}
         <aside style={{ background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${C.border}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg, ${C.indigo}, #8b5cf6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📊</div>
               <span style={{ fontSize: 17, fontWeight: 700, color: C.white, letterSpacing: "-0.01em", lineHeight: 1.2 }}>Planejamento Financeiro</span>
+            </div>
+            {/* Toggle modo */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, background: C.bg, borderRadius: 10, padding: 3 }}>
+              {[["acumulacao", "📈", "Acumulação"], ["usufruto", "🌅", "Só Usufruto"]].map(([modo, icon, label]) => (
+                <button key={modo} onClick={() => setModoApp(modo)}
+                  style={{ padding: "8px 4px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 11, fontFamily: C.sans, fontWeight: 600, transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    background: modoApp === modo ? (modo === "acumulacao" ? C.indigo : C.emerald) : "transparent",
+                    color: modoApp === modo ? "#fff" : C.slate }}>
+                  <span>{icon}</span>{label}
+                </button>
+              ))}
             </div>
           </div>
 
           <div ref={sidebarRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
 
-            {/* ── ACUMULAÇÃO ── */}
-            <div style={{ marginBottom: 8, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          {/* ── SIDEBAR USUFRUTO PURO ── */}
+          {modoApp === "usufruto" && (
+            <div>
+              <div style={{ marginBottom: 8, border: `1px solid ${C.emerald}40`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ padding: "10px 14px", background: `${C.emerald}12`, display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>🌅</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: C.white2 }}>Fase de Usufruto</span>
+                </div>
+                <div style={{ padding: "14px 14px 8px", background: "rgba(15,23,42,0.3)" }}>
+
+                  {/* Patrimônio Atual */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Patrimônio Atual</label>
+                    <div style={{ position: "relative" }}>
+                      <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.slate, pointerEvents: "none" }}>R$</span>
+                      <input type="text"
+                        value={inputFoco["u_patrimonio"] ? (inputTemp["u_patrimonio"] || "") : pu.patrimonio}
+                        onFocus={() => { setInputFoco(f => ({...f, u_patrimonio: true})); setInputTemp(t => ({...t, u_patrimonio: String(limparMoeda(pu.patrimonio) || "")})); }}
+                        onBlur={() => { setInputFoco(f => ({...f, u_patrimonio: false})); const n = parseFloat((inputTemp["u_patrimonio"]||"0").replace(",","."))||0; setPu(prev => ({...prev, patrimonio: n.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})})); }}
+                        onChange={e => setInputTemp(t => ({...t, u_patrimonio: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                        style={{ width:"100%", paddingLeft:30, paddingRight:10, paddingTop:8, paddingBottom:8, background:C.surface2, border:`1px solid ${inputFoco["u_patrimonio"]?C.emerald:C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box" }} />
+                    </div>
+                  </div>
+
+                  {/* Idade Atual */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Idade Atual</label>
+                    <div style={{ position: "relative" }}>
+                      <input type="number" value={pu.idadeAtual} min={20} max={100}
+                        onChange={e => setPu(prev => ({...prev, idadeAtual: e.target.value}))}
+                        style={{ width:"100%", padding:"8px 40px 8px 10px", background:C.surface2, border:`1px solid ${C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box" }} />
+                      <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:11, color:C.slate, pointerEvents:"none" }}>anos</span>
+                    </div>
+                  </div>
+
+                  {/* Prazo */}
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Prazo de Usufruto</label>
+                    <div style={{ position: "relative" }}>
+                      <input type="number" value={pu.prazo} min={1} max={60}
+                        onChange={e => setPu(prev => ({...prev, prazo: e.target.value}))}
+                        style={{ width:"100%", padding:"8px 40px 8px 10px", background:C.surface2, border:`1px solid ${C.border2}`, borderRadius:8, color:C.white, fontSize:13, fontFamily:C.mono, outline:"none", boxSizing:"border-box" }} />
+                      <span style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", fontSize:11, color:C.slate, pointerEvents:"none" }}>anos</span>
+                    </div>
+                  </div>
+
+                  {/* Sliders: Retorno Nominal e Inflação */}
+                  {[
+                    { label: "Retorno Nominal", key: "retornoNominal", min: 0, max: 30 },
+                    { label: "Inflação", key: "inflacao", min: 0, max: 20 },
+                  ].map(({ label, key, min, max }) => {
+                    const raw = parseFloat(pu[key] || "0") || 0;
+                    return (
+                      <div key={key} style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans, flex: 1 }}>{label}</span>
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            <input type="text"
+                              value={inputFoco[`u_${key}`] ? (inputTemp[`u_${key}`] || "") : raw.toFixed(1)}
+                              onFocus={() => { setInputFoco(f => ({...f, [`u_${key}`]: true})); setInputTemp(t => ({...t, [`u_${key}`]: String(raw)})); }}
+                              onBlur={() => { setInputFoco(f => ({...f, [`u_${key}`]: false})); const n = parseFloat((inputTemp[`u_${key}`]||"0").replace(",",".")); if (!isNaN(n)) setPu(prev => ({...prev, [key]: String(Math.min(max, Math.max(min, n)))})); }}
+                              onChange={e => setInputTemp(t => ({...t, [`u_${key}`]: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                              style={{ width: 72, textAlign: "right", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${inputFoco[`u_${key}`] ? C.emerald : C.border}`, borderRadius: 6, padding: "3px 22px 3px 8px", outline: "none" }}
+                            />
+                            <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
+                          </div>
+                        </div>
+                        <input type="range" min={min} max={max} step={0.1} value={raw}
+                          onChange={e => setPu(prev => ({...prev, [key]: e.target.value}))}
+                          style={{ width: "100%", accentColor: C.emerald, cursor: "pointer", height: 4, display: "block" }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 4 }}>
+                          <span>{min}%</span><span>{max}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Retorno real automático */}
+                  {(() => {
+                    const retNom = parseFloat(pu.retornoNominal || "0") || 0;
+                    const infl   = parseFloat(pu.inflacao || "0") || 0;
+                    const retReal = ((1 + retNom/100) / (1 + infl/100) - 1) * 100;
+                    const cor = retReal >= 0 ? C.emerald : C.rose;
+                    return (
+                      <div style={{ marginBottom: 14, padding: "8px 12px", background: `${cor}18`, borderRadius: 8, border: `1px solid ${cor}30`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: C.slate }}>Retorno real</span>
+                        <span style={{ fontSize: 14, color: cor, fontFamily: C.mono, fontWeight: 600 }}>{retReal >= 0 ? "+" : ""}{retReal.toFixed(2).replace(".",",")}%</span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Taxa de Retirada */}
+                  {(() => {
+                    const raw = parseFloat(pu.taxaRetirada || "4") || 4;
+                    return (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                          <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans, flex: 1 }}>Taxa de Retirada Anual</span>
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            <input type="text"
+                              value={inputFoco["u_taxaRetirada"] ? (inputTemp["u_taxaRetirada"] || "") : raw.toFixed(1)}
+                              onFocus={() => { setInputFoco(f => ({...f, u_taxaRetirada: true})); setInputTemp(t => ({...t, u_taxaRetirada: String(raw)})); }}
+                              onBlur={() => { setInputFoco(f => ({...f, u_taxaRetirada: false})); const n = parseFloat((inputTemp["u_taxaRetirada"]||"0").replace(",",".")); if (!isNaN(n)) setPu(prev => ({...prev, taxaRetirada: String(Math.min(20, Math.max(0.5, n)))})); }}
+                              onChange={e => setInputTemp(t => ({...t, u_taxaRetirada: e.target.value.replace(/[^0-9.,]/g,"")}))}
+                              style={{ width: 72, textAlign: "right", fontSize: 12, color: C.white, fontFamily: C.mono, background: C.surface2, border: `1px solid ${inputFoco["u_taxaRetirada"] ? C.emerald : C.border}`, borderRadius: 6, padding: "3px 22px 3px 8px", outline: "none" }}
+                            />
+                            <span style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.slate, pointerEvents: "none" }}>%</span>
+                          </div>
+                        </div>
+                        <input type="range" min={0.5} max={20} step={0.1} value={raw}
+                          onChange={e => setPu(prev => ({...prev, taxaRetirada: e.target.value}))}
+                          style={{ width: "100%", accentColor: C.emerald, cursor: "pointer", height: 4, display: "block" }} />
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.slate2, marginTop: 4 }}>
+                          <span>0.5%</span><span>20%</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Modo de Usufruto */}
+                  <div style={{ marginBottom: 14 }}>
+                    <span style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Modo de Usufruto</span>
+                    <select value={pu.modoUsufruto || "fixa"} onChange={e => setPu(prev => ({...prev, modoUsufruto: e.target.value}))}
+                      style={{ width: "100%", padding: "8px 10px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 8, color: C.white, fontSize: 12, fontFamily: C.sans, outline: "none" }}>
+                      <option value="fixa">Renda fixa real</option>
+                      <option value="variavel">Retirada percentual</option>
+                    </select>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── SIDEBAR ACUMULAÇÃO (original) ── */}
+          {modoApp === "acumulacao" && (<>
+
               <button onClick={() => setAccOpen(!accOpen)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: accOpen ? C.surface2 : "transparent", border: "none", cursor: "pointer", color: C.white2, fontFamily: C.sans, fontSize: 13, fontWeight: 500 }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}><span>📈</span>Fase de Acumulação</span>
                 <span style={{ color: C.slate, fontSize: 10, transform: accOpen ? "rotate(180deg)" : "none" }}>▼</span>
@@ -559,6 +777,7 @@ export default function App() {
                 </div>
               )}
             </div>
+          </> /* fim modoApp === acumulacao na sidebar */}
           </div>
 
           <div style={{ padding: "14px", borderTop: `1px solid ${C.border}` }}>
@@ -583,22 +802,190 @@ export default function App() {
           {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
 
-            {/* Nome + consultoria — esquerda do main */}
+            {/* Nome + consultoria */}
             <div>
               <div style={{ fontSize: 20, fontWeight: 700, color: C.white, letterSpacing: "-0.01em" }}>Geraldo Búrigo</div>
               <div style={{ fontSize: 13, color: C.slate, marginTop: 3 }}>Consultoria Financeira</div>
             </div>
 
-            {/* Abas — direita */}
-            <div style={{ display: "flex", gap: 6, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
-              {["graficos", "sensibilidade", "tabela"].map(aba => (
-                <button key={aba} style={tabStyle(aba)} onClick={() => setAbaAtiva(aba)}>
-                  {aba === "graficos" ? "Visão Geral" : aba === "sensibilidade" ? "Sensibilidade" : "Tabela"}
-                </button>
-              ))}
-            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {/* Toggle modo app */}
+              <div style={{ display: "flex", gap: 0, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
+                {[["acumulacao", "📈 Acumulação + Usufruto"], ["usufruto", "🌅 Só Usufruto"]].map(([modo, label]) => (
+                  <button key={modo} onClick={() => setModoApp(modo)}
+                    style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontFamily: C.sans, fontWeight: 500, transition: "all 0.2s",
+                      background: modoApp === modo ? (modo === "acumulacao" ? C.indigo : C.emerald) : "transparent",
+                      color: modoApp === modo ? "#fff" : C.slate }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
 
+              {/* Abas — só no modo acumulação */}
+              {modoApp === "acumulacao" && (
+                <div style={{ display: "flex", gap: 6, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
+                  {["graficos", "sensibilidade", "tabela"].map(aba => (
+                    <button key={aba} style={tabStyle(aba)} onClick={() => setAbaAtiva(aba)}>
+                      {aba === "graficos" ? "Visão Geral" : aba === "sensibilidade" ? "Sensibilidade" : "Tabela"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* ── MODO USUFRUTO PURO ── */}
+          {modoApp === "usufruto" && (() => {
+            const { pat0, prazo, rendaMensalReal, pontos, ultimo, retNominalPct, retRealPct, taxaAnual } = cenariosUsufruto;
+            const idadeAtual = parseInt(pu.idadeAtual || 60);
+            const herancaNominal = ultimo?.patNominal ?? 0;
+            const herancaReal    = ultimo?.patReal    ?? 0;
+            const rendaMensalNominal = pontos[1]?.retirNomMensal ?? 0;
+
+            return (
+              <div>
+                {/* Cards resultados */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
+                  <MetricCard label="Herança · Patrimônio Nominal" value={fmtCpct(herancaNominal)} sub={`Fim do usufruto (${idadeAtual + prazo} anos)`} accent={C.amber} icon="🏦" />
+                  <MetricCard label="Herança · Patrimônio Real" value={fmtCpct(herancaReal)} sub="Poder de compra hoje" accent={C.indigo} icon="📈" />
+                  <MetricCard label="Renda Mensal Nominal" value={fmtCpct(rendaMensalNominal)} sub="Primeiro ano de retirada" accent={C.amber} icon="💵" />
+                  <MetricCard label="Renda Mensal Real" value={fmtCpct(rendaMensalReal)} sub="Poder de compra hoje" accent={C.emerald} icon="💰" />
+                </div>
+
+                {/* Gráfico patrimônio nominal e real */}
+                <GlassCard style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <SectionTitle>Evolução do Patrimônio ao Longo do Usufruto</SectionTitle>
+                    <div style={{ display: "flex", gap: 14 }}>
+                      {[[C.amber, "Nominal"], [C.indigo, "Real"]].map(([cor, lbl]) => (
+                        <span key={lbl} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.slate }}>
+                          <span style={{ width: 14, height: 3, background: cor, borderRadius: 2, display: "inline-block" }} />{lbl}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ height: 300 }}>
+                    <ResponsiveContainer>
+                      <LineChart data={pontos} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid {...chartProps.cartesianGrid} />
+                        <XAxis dataKey="ano" {...chartProps.xAxis} />
+                        <YAxis tickFormatter={v => `${(v/1e6).toFixed(1)}Mi`} {...chartProps.yAxis} />
+                        <Tooltip content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          return (
+                            <div style={{ ...chartProps.tooltip.contentStyle, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 11, color: C.slate, marginBottom: 8 }}>Ano {label} · {idadeAtual + label} anos</div>
+                              {payload.map(s => (
+                                <div key={s.name} style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
+                                  <span style={{ fontSize:11, color: s.color }}>{s.name}</span>
+                                  <span style={{ fontSize:12, color: s.color, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(s.value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }} />
+                        <Line type="monotone" dataKey="patNominal" name="Nominal" stroke={C.amber} strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.amber }} />
+                        <Line type="monotone" dataKey="patReal"    name="Real"    stroke={C.indigo} strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.indigo }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </GlassCard>
+
+                {/* Gráfico retiradas nominal e real */}
+                <GlassCard style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                    <SectionTitle>Retirada Anual ao Longo do Usufruto</SectionTitle>
+                    <div style={{ display: "flex", gap: 14 }}>
+                      {[[C.amber, "Nominal"], [C.emerald, "Real"]].map(([cor, lbl]) => (
+                        <span key={lbl} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.slate }}>
+                          <span style={{ width: 14, height: 3, background: cor, borderRadius: 2, display: "inline-block" }} />{lbl}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ height: 260 }}>
+                    <ResponsiveContainer>
+                      <LineChart data={pontos.filter(d => d.ano > 0)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid {...chartProps.cartesianGrid} />
+                        <XAxis dataKey="ano" {...chartProps.xAxis} />
+                        <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                        <Tooltip content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0]?.payload;
+                          return (
+                            <div style={{ ...chartProps.tooltip.contentStyle, padding: "12px 16px" }}>
+                              <div style={{ fontSize: 11, color: C.slate, marginBottom: 8 }}>Ano {label} · {idadeAtual + label} anos</div>
+                              <div style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
+                                <span style={{ fontSize:11, color: C.amber }}>Retirada nominal anual</span>
+                                <span style={{ fontSize:12, color: C.amber, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirNominal)}</span>
+                              </div>
+                              <div style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
+                                <span style={{ fontSize:11, color: C.amber }}>Retirada nominal mensal</span>
+                                <span style={{ fontSize:12, color: C.amber, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirNomMensal)}</span>
+                              </div>
+                              <div style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
+                                <span style={{ fontSize:11, color: C.emerald }}>Retirada real anual</span>
+                                <span style={{ fontSize:12, color: C.emerald, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirReal)}</span>
+                              </div>
+                              <div style={{ display:"flex", justifyContent:"space-between", gap:16 }}>
+                                <span style={{ fontSize:11, color: C.emerald }}>Retirada real mensal</span>
+                                <span style={{ fontSize:12, color: C.emerald, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirRealMensal)}</span>
+                              </div>
+                            </div>
+                          );
+                        }} />
+                        <Line type="monotone" dataKey="retirNominal" name="Retirada Nominal" stroke={C.amber}   strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.amber }} />
+                        <Line type="monotone" dataKey="retirReal"    name="Retirada Real"    stroke={C.emerald} strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.emerald }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </GlassCard>
+
+                {/* Tabela evolução */}
+                <GlassCard>
+                  <SectionTitle>Evolução Anual — Patrimônio e Retiradas</SectionTitle>
+                  <div style={{ overflowX: "auto", maxHeight: 460 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 800 }}>
+                      <thead>
+                        <tr>
+                          {[
+                            ["Ano","left",C.slate], ["Idade","left",C.slate],
+                            ["Pat. Nominal","right",C.amber], ["Pat. Real","right",C.indigo],
+                            ["Retirada Anual Nom.","right",C.amber], ["Retirada Anual Real","right",C.emerald],
+                            ["Retirada Mensal Nom.","right",C.amber], ["Retirada Mensal Real","right",C.emerald],
+                          ].map(([h, align, cor]) => (
+                            <th key={h} style={{ padding:"10px 14px", textAlign: align, borderBottom:`1px solid ${C.border}`, fontSize:10, color: cor, fontWeight:500, fontFamily:C.sans, textTransform:"uppercase", letterSpacing:"0.06em", position:"sticky", top:0, background:C.surface, whiteSpace:"nowrap" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pontos.map((d, i) => {
+                          const bg = i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)";
+                          return (
+                            <tr key={d.ano} style={{ background: bg }}
+                              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
+                              onMouseLeave={e => e.currentTarget.style.background = bg}>
+                              <td style={{ padding:"8px 14px", fontSize:12, color:C.slate, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)` }}>{d.ano}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color:C.white2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)` }}>{idadeAtual + d.ano}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color: d.patNominal>0?C.amber:C.slate2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)`, textAlign:"right" }}>{d.patNominal>0?fmtBRL(d.patNominal):"—"}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color: d.patReal>0?C.indigo:C.slate2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)`, textAlign:"right" }}>{d.patReal>0?fmtBRL(d.patReal):"—"}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color: d.retirNominal>0?C.amber:C.slate2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)`, textAlign:"right" }}>{d.retirNominal>0?fmtBRL(d.retirNominal):"—"}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color: d.retirReal>0?C.emerald:C.slate2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)`, textAlign:"right" }}>{d.retirReal>0?fmtBRL(d.retirReal):"—"}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color: d.retirNomMensal>0?C.amber:C.slate2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)`, textAlign:"right" }}>{d.retirNomMensal>0?fmtBRL(d.retirNomMensal):"—"}</td>
+                              <td style={{ padding:"8px 14px", fontSize:12, color: d.retirRealMensal>0?C.emerald:C.slate2, fontFamily:C.mono, borderBottom:`1px solid rgba(255,255,255,0.04)`, textAlign:"right" }}>{d.retirRealMensal>0?fmtBRL(d.retirRealMensal):"—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </GlassCard>
+              </div>
+            );
+          })()}
+
+          {/* ── MODO ACUMULAÇÃO + USUFRUTO ── */}
+          {modoApp === "acumulacao" && <>
 
           {/* Resumo Executivo */}
           {(() => {
@@ -931,6 +1318,7 @@ export default function App() {
               </div>
             </GlassCard>
           )}
+          </> /* fim modoApp === acumulacao */}
         </main>
       </div>
 
