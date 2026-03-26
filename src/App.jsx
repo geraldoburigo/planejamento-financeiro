@@ -267,13 +267,16 @@ export default function App() {
   );
 
   const MetricCard = ({ label, value, sub, accent = C.indigo, icon, subColor }) => (
-    <GlassCard>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <span style={{ fontSize: 11, color: C.slate, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: C.sans, lineHeight: 1.4 }}>{label}</span>
-        {icon && <span style={{ fontSize: 15, opacity: 0.7, flexShrink: 0, marginLeft: 6 }}>{icon}</span>}
+    <GlassCard style={{ minHeight: 120, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "16px 18px" }}>
+      {/* Label + ícone — sempre em uma linha, label trunca se necessário */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 10, color: C.slate, textTransform: "uppercase", letterSpacing: "0.07em", fontFamily: C.sans, lineHeight: 1.5, flex: 1 }}>{label}</span>
+        {icon && <span style={{ fontSize: 13, opacity: 0.6, flexShrink: 0 }}>{icon}</span>}
       </div>
-      <div style={{ fontSize: 24, fontWeight: 600, color: accent, fontFamily: C.mono, marginTop: 10, letterSpacing: "-0.02em" }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: subColor || C.slate2, marginTop: 6, fontFamily: C.sans }}>{sub}</div>}
+      {/* Valor — fonte adaptativa via fitText trick com tamanho fixo grande */}
+      <div style={{ fontSize: 20, fontWeight: 600, color: accent, fontFamily: C.mono, letterSpacing: "-0.02em", lineHeight: 1.2, wordBreak: "break-all" }}>{value}</div>
+      {/* Sub — sempre na base */}
+      <div style={{ fontSize: 10, color: subColor || C.slate2, marginTop: 8, fontFamily: C.sans }}>{sub || "\u00A0"}</div>
     </GlassCard>
   );
 
@@ -592,14 +595,19 @@ export default function App() {
           {/* Cards linha 1 — 4 cards: patrimônio nominal/real + renda nominal/real */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginBottom: 12 }}>
             <MetricCard label="Patrimônio Nominal" value={fmtCpct(resumo.patrimonioAcumuladoNominal)} sub="Valor futuro nominal" accent={C.amber} icon="🏦" />
-            <MetricCard label="Patrimônio Real" value={fmtCpct(resumo.patrimonioAcumuladoReal)} sub="Poder de compra de hoje" accent={C.indigo} icon="📈" />
-            <MetricCard label="Renda Mensal Nominal" value={fmtBRL(resumo.rendaMensalNominalInicial)} sub="Valor futuro nominal" accent={C.amber} icon="💵" />
-            <MetricCard label="Renda Mensal Real" value={fmtBRL(resumo.rendaMensalRealInicial)} sub="Poder de compra de hoje" accent={C.emerald} icon="💰" />
+            <MetricCard label="Patrimônio Real" value={fmtCpct(resumo.patrimonioAcumuladoReal)} sub="Poder de compra hoje" accent={C.indigo} icon="📈" />
+            <MetricCard label="Renda Mensal Nominal" value={fmtCpct(resumo.rendaMensalNominalInicial)} sub="Valor futuro nominal" accent={C.amber} icon="💵" />
+            <MetricCard label="Renda Mensal Real" value={fmtCpct(resumo.rendaMensalRealInicial)} sub="Poder de compra hoje" accent={C.emerald} icon="💰" />
           </div>
 
           {/* Cards linha 2 — 4 cards: aporte necessário, tempo para meta, patrimônio necessário nominal/real */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
-            <MetricCard label="Aporte Necessário" value={aporteNecessario ? fmtBRL(aporteNecessario) : "—"} sub={`Mensal para atingir em ${p.prazoAcumulacao} anos`} accent={C.slate} icon="🎯" />
+            <MetricCard
+              label="Aporte Necessário"
+              value={aporteNecessario ? fmtCpct(aporteNecessario) : "—"}
+              sub={`Mensal · meta em ${p.prazoAcumulacao} anos`}
+              accent={C.slate} icon="🎯"
+            />
             <MetricCard
               label="Tempo para Meta"
               value={anosCasoAtual ? `${anosCasoAtual.toFixed(1).replace(".",",")} anos` : "Não atinge"}
