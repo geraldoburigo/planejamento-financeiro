@@ -1121,89 +1121,97 @@ export default function App() {
                   <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:16px">
                     <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Patrimônio Real ao Longo do Tempo</div>
                     <div style="font-size:10px;color:#64748b;margin-bottom:16px">Poder de compra de hoje · R$ Mi</div>
-                    <canvas id="chart1" height="120"></canvas>
+                    <div style="position:relative;width:100%;height:200px"><canvas id="chart1"></canvas></div>
                   </div>
 
                   <!-- Grid 2 colunas para os outros 3 gráficos -->
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
                     <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px">
                       <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Renda Mensal no Usufruto</div>
                       <div style="font-size:10px;color:#64748b;margin-bottom:16px">Real · poder de compra hoje</div>
-                      <canvas id="chart2" height="160"></canvas>
+                      <div style="position:relative;width:100%;height:200px"><canvas id="chart2"></canvas></div>
                     </div>
                     <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px">
                       <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Fluxos Anuais</div>
                       <div style="font-size:10px;color:#64748b;margin-bottom:16px">Aportes e resgates reais</div>
-                      <canvas id="chart3" height="160"></canvas>
+                      <div style="position:relative;width:100%;height:200px"><canvas id="chart3"></canvas></div>
                     </div>
                   </div>
                   <div style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:32px">
                     <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Total Investido vs Rendimento</div>
                     <div style="font-size:10px;color:#64748b;margin-bottom:16px">Fase de acumulação · R$ Mi</div>
-                    <canvas id="chart4" height="100"></canvas>
+                    <div style="position:relative;width:100%;height:200px"><canvas id="chart4"></canvas></div>
                   </div>
 
                   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
                   <script>
                     Chart.defaults.color = '#64748b';
                     Chart.defaults.borderColor = 'rgba(148,163,184,0.08)';
-                    const dados = ${JSON.stringify(dados.map(d => ({ ano: d.ano, fase: d.fase, pat: d.patrimonioReal, renda: d.rendaMensalReal, fluxoReal: d.fase==="Acumulação" ? d.aporteAnualReal : d.resgateAnualReal, aporte: d.totalInvestido/1e6, rend: d.rendimento/1e6 })))};
-                    const acc = dados.filter(d=>d.fase==="Acumulação");
-                    const usu = dados.filter(d=>d.fase==="Usufruto");
-                    const todos = dados;
+                    const dadosPdf = ${JSON.stringify(dados.map(d => ({
+                      ano: d.ano, fase: d.fase,
+                      patReal: d.patrimonioReal,
+                      renda: d.rendaMensalReal,
+                      fluxoReal: d.fase==="Acumulação" ? d.aporteAnualReal : d.resgateAnualReal,
+                      totalInv: d.totalInvestido/1e6,
+                      rend: d.rendimento/1e6
+                    })))};
+                    const acc = dadosPdf.filter(d=>d.fase==="Acumulação");
+                    const usu = dadosPdf.filter(d=>d.fase==="Usufruto");
+                    const opts = { responsive:true, maintainAspectRatio:false, animation:false };
 
-                    // Chart 1 — Patrimônio Real
                     new Chart(document.getElementById('chart1'), {
-                      type:'line', data:{
-                        labels: todos.map(d=>d.ano),
-                        datasets:[{ data: todos.map(d=>+(d.pat/1e6).toFixed(2)), fill:true,
+                      type:'line',
+                      data:{
+                        labels: dadosPdf.map(d=>d.ano),
+                        datasets:[{ data: dadosPdf.map(d=>+(d.patReal/1e6).toFixed(2)), fill:true,
                           borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.15)',
-                          borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.4 }]
-                      }, options:{ responsive:true, maintainAspectRatio:false,
-                        plugins:{ legend:{display:false} },
+                          borderWidth:2, pointRadius:0, tension:0.4 }]
+                      },
+                      options:{ ...opts, plugins:{legend:{display:false}},
                         scales:{ x:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{maxTicksLimit:12,font:{size:10}}},
-                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'Mi'}} } }
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'Mi'}} }}
                     });
 
-                    // Chart 2 — Renda Mensal Real
                     new Chart(document.getElementById('chart2'), {
-                      type:'line', data:{
+                      type:'line',
+                      data:{
                         labels: usu.map(d=>d.ano),
                         datasets:[{ data: usu.map(d=>+(d.renda/1000).toFixed(1)), fill:true,
                           borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.15)',
-                          borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.4 }]
-                      }, options:{ responsive:true, maintainAspectRatio:false,
-                        plugins:{ legend:{display:false} },
+                          borderWidth:2, pointRadius:0, tension:0.4 }]
+                      },
+                      options:{ ...opts, plugins:{legend:{display:false}},
                         scales:{ x:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{maxTicksLimit:10,font:{size:10}}},
-                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'k'}} } }
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'k'}} }}
                     });
 
-                    // Chart 3 — Fluxos Anuais
-                    const fluxoDados = todos.filter(d=>d.ano>0);
+                    const fluxos = dadosPdf.filter(d=>d.ano>0);
                     new Chart(document.getElementById('chart3'), {
-                      type:'bar', data:{
-                        labels: fluxoDados.map(d=>d.ano),
-                        datasets:[{ data: fluxoDados.map(d=>+(d.fluxoReal/1000).toFixed(1)),
-                          backgroundColor: fluxoDados.map(d=>d.fase==="Acumulação"?"rgba(16,185,129,0.75)":"rgba(244,63,94,0.75)"),
-                          borderRadius:3, borderSkipped:false }]
-                      }, options:{ responsive:true, maintainAspectRatio:false,
-                        plugins:{ legend:{display:false} },
+                      type:'bar',
+                      data:{
+                        labels: fluxos.map(d=>d.ano),
+                        datasets:[{ data: fluxos.map(d=>+(d.fluxoReal/1000).toFixed(1)),
+                          backgroundColor: fluxos.map(d=>d.fase==="Acumulação"?"rgba(16,185,129,0.75)":"rgba(244,63,94,0.75)"),
+                          borderRadius:3 }]
+                      },
+                      options:{ ...opts, plugins:{legend:{display:false}},
                         scales:{ x:{grid:{display:false},ticks:{maxTicksLimit:10,font:{size:10}}},
-                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'k'}} } }
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'k'}} }}
                     });
 
-                    // Chart 4 — Total Investido vs Rendimento
                     new Chart(document.getElementById('chart4'), {
-                      type:'bar', data:{
+                      type:'bar',
+                      data:{
                         labels: acc.map(d=>d.ano),
                         datasets:[
-                          { label:'Total Investido', data: acc.map(d=>+d.aporte.toFixed(2)), backgroundColor:'rgba(16,185,129,0.75)', stack:'a', borderRadius:0 },
-                          { label:'Rendimento', data: acc.map(d=>+d.rend.toFixed(2)), backgroundColor:'rgba(99,102,241,0.85)', stack:'a', borderRadius:3 }
+                          { label:'Total Investido', data: acc.map(d=>+d.totalInv.toFixed(2)), backgroundColor:'rgba(16,185,129,0.75)', stack:'a', borderRadius:0 },
+                          { label:'Rendimento',      data: acc.map(d=>+d.rend.toFixed(2)),     backgroundColor:'rgba(99,102,241,0.85)', stack:'a', borderRadius:3 }
                         ]
-                      }, options:{ responsive:true, maintainAspectRatio:false,
+                      },
+                      options:{ ...opts,
                         plugins:{ legend:{ display:true, position:'top', labels:{color:'#94a3b8',font:{size:10},boxWidth:10,boxHeight:10} } },
                         scales:{ x:{grid:{display:false},ticks:{maxTicksLimit:12,font:{size:10}}},
-                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'Mi'}} } }
+                                 y:{grid:{color:'rgba(148,163,184,0.06)'},ticks:{font:{size:10},callback:v=>v+'Mi'}} }}
                     });
                   </script>
 
