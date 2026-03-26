@@ -120,7 +120,11 @@ export default function App() {
   const [modoGraficos, setModoGraficos] = useState("nominal");
   const [inputFoco, setInputFoco] = useState({});
   const [inputTemp, setInputTemp] = useState({});
+  const [modalPdf, setModalPdf] = useState(false);
+  const [nomeCliente, setNomeCliente] = useState("");
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const sidebarRef = useRef(null);
+  const relatorioRef = useRef(null);
 
   useEffect(() => {
     try { localStorage.setItem("pf-v3", JSON.stringify(parametros)); } catch {}
@@ -344,11 +348,10 @@ export default function App() {
         {/* ── SIDEBAR ── */}
         <aside style={{ background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${C.border}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, ${C.indigo}, #8b5cf6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>📊</div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: C.white }}>Parâmetros</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg, ${C.indigo}, #8b5cf6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📊</div>
+              <span style={{ fontSize: 17, fontWeight: 700, color: C.white, letterSpacing: "-0.01em", lineHeight: 1.2 }}>Planejamento Financeiro</span>
             </div>
-            <span style={{ fontSize: 10, color: C.slate2, letterSpacing: "0.1em", textTransform: "uppercase" }}>Control Room</span>
           </div>
 
           <div ref={sidebarRef} style={{ flex: 1, overflowY: "auto", padding: "14px 14px 0" }}>
@@ -463,6 +466,22 @@ export default function App() {
                       </div>
                     );
                   })}
+
+                  {/* Retorno real acumulação — calculado automaticamente (Fisher) */}
+                  {(() => {
+                    const retNom = parseFloat((parametros.retornoNominalAcumulacao || "0").replace(",", ".")) || 0;
+                    const infl   = parseFloat((parametros.inflacao || "0").replace(",", ".")) || 0;
+                    const retReal = ((1 + retNom/100) / (1 + infl/100) - 1) * 100;
+                    const cor = retReal >= 0 ? C.emerald : C.rose;
+                    return (
+                      <div style={{ marginBottom: 14, padding: "8px 12px", background: `${cor}18`, borderRadius: 8, border: `1px solid ${cor}30`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>Retorno real (acumulação)</span>
+                        <span style={{ fontSize: 14, color: cor, fontFamily: C.mono, fontWeight: 600 }}>
+                          {retReal >= 0 ? "+" : ""}{retReal.toFixed(2).replace(".", ",")}%
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -503,6 +522,22 @@ export default function App() {
                       </div>
                     );
                   })}
+
+                  {/* Retorno real usufruto — calculado automaticamente (Fisher) */}
+                  {(() => {
+                    const retNom = parseFloat((parametros.retornoNominalUsufruto || "0").replace(",", ".")) || 0;
+                    const infl   = parseFloat((parametros.inflacao || "0").replace(",", ".")) || 0;
+                    const retReal = ((1 + retNom/100) / (1 + infl/100) - 1) * 100;
+                    const cor = retReal >= 0 ? C.emerald : C.rose;
+                    return (
+                      <div style={{ marginBottom: 14, padding: "8px 12px", background: `${cor}18`, borderRadius: 8, border: `1px solid ${cor}30`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 12, color: C.slate, fontFamily: C.sans }}>Retorno real (usufruto)</span>
+                        <span style={{ fontSize: 14, color: cor, fontFamily: C.mono, fontWeight: 600 }}>
+                          {retReal >= 0 ? "+" : ""}{retReal.toFixed(2).replace(".", ",")}%
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <div style={{ marginBottom: 14 }}>
                     <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Prazo de Usufruto</label>
                     <div style={{ position: "relative" }}>
@@ -527,6 +562,10 @@ export default function App() {
           </div>
 
           <div style={{ padding: "14px", borderTop: `1px solid ${C.border}` }}>
+            <button onClick={() => setModalPdf(true)}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: `linear-gradient(135deg, ${C.emerald}, #0d9488)`, color: "#fff", fontSize: 12, cursor: "pointer", fontFamily: C.sans, fontWeight: 600, marginBottom: 8 }}>
+              📄 Gerar Relatório PDF
+            </button>
             <button onClick={() => setParametros(DEFAULTS)}
               style={{ width: "100%", padding: "10px", borderRadius: 10, border: `1px solid ${C.border2}`, background: "transparent", color: C.slate, fontSize: 12, cursor: "pointer", fontFamily: C.sans, marginBottom: 8 }}>
               Resetar parâmetros
@@ -543,19 +582,22 @@ export default function App() {
 
           {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+
+            {/* Nome + consultoria — esquerda do main */}
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, color: C.white, letterSpacing: "-0.02em" }}>Planejamento Financeiro</h1>
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.slate2 }}>
-                Simulação patrimonial · {p.idadeAtual} → {p.idadeAposentadoria} anos · {p.prazoAcumulacao} anos de acumulação
-              </p>
+              <div style={{ fontSize: 20, fontWeight: 700, color: C.white, letterSpacing: "-0.01em" }}>Geraldo Búrigo</div>
+              <div style={{ fontSize: 13, color: C.slate, marginTop: 3 }}>Consultoria Financeira</div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+
+            {/* Abas — direita */}
+            <div style={{ display: "flex", gap: 6, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
               {["graficos", "sensibilidade", "tabela"].map(aba => (
                 <button key={aba} style={tabStyle(aba)} onClick={() => setAbaAtiva(aba)}>
                   {aba === "graficos" ? "Visão Geral" : aba === "sensibilidade" ? "Sensibilidade" : "Tabela"}
                 </button>
               ))}
             </div>
+
           </div>
 
           {/* Resumo Executivo */}
@@ -891,6 +933,199 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* ── MODAL PDF ── */}
+      {modalPdf && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 20, padding: 32, width: "100%", maxWidth: 480, boxShadow: "0 40px 80px rgba(0,0,0,0.6)" }}>
+            <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700, color: C.white }}>Gerar Relatório PDF</h2>
+            <p style={{ margin: "0 0 24px", fontSize: 13, color: C.slate }}>Preencha o nome do cliente para personalizar o relatório.</p>
+
+            <label style={{ fontSize: 12, color: C.slate, display: "block", marginBottom: 6 }}>Nome do cliente</label>
+            <input
+              type="text"
+              placeholder="Ex: João Silva"
+              value={nomeCliente}
+              onChange={e => setNomeCliente(e.target.value)}
+              style={{ width: "100%", padding: "10px 14px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 10, color: C.white, fontSize: 14, fontFamily: C.sans, outline: "none", boxSizing: "border-box", marginBottom: 24 }}
+            />
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setModalPdf(false)}
+                style={{ flex: 1, padding: "10px", borderRadius: 10, border: `1px solid ${C.border2}`, background: "transparent", color: C.slate, fontSize: 13, cursor: "pointer", fontFamily: C.sans }}>
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  setGerandoPdf(true);
+                  await new Promise(r => setTimeout(r, 100));
+                  // Gera o HTML do relatório como nova janela para impressão
+                  const fmtB = v => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 }).format(v || 0);
+                  const fmtC = v => v >= 1e6 ? `R$ ${(v/1e6).toFixed(2).replace(".",",")} Mi` : v >= 1e3 ? `R$ ${(v/1e3).toFixed(1).replace(".",",")} K` : fmtB(v);
+                  const metaStr = resumo.patrimonioAcumuladoReal >= patrimonioNecessarioReal ? "✅ META ATINGIDA" : "⚠️ META NÃO ATINGIDA";
+                  const metaCor = resumo.patrimonioAcumuladoReal >= patrimonioNecessarioReal ? "#10b981" : "#f43f5e";
+                  const retRealAcc = ((1 + p.retornoNominalAcumulacao) / (1 + p.inflacao) - 1) * 100;
+                  const retRealUsu = ((1 + p.retornoNominalUsufruto) / (1 + p.inflacao) - 1) * 100;
+                  const hoje = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+
+                  const tabelaRows = dados.slice(0, 40).map(d => `
+                    <tr style="background:${d.ano === p.prazoAcumulacao ? "rgba(99,102,241,0.15)" : d.ano % 2 === 0 ? "#1a2332" : "#1e293b"}">
+                      <td>${d.ano}</td>
+                      <td>${p.idadeAtual + d.ano}</td>
+                      <td><span style="color:${d.fase==="Acumulação"?"#6366f1":"#10b981"}">${d.fase}</span></td>
+                      <td>${fmtB(d.patrimonioNominal)}</td>
+                      <td>${fmtB(d.patrimonioReal)}</td>
+                      <td>${d.aporteAnualNominal > 0 ? fmtB(d.aporteAnualNominal) : "—"}</td>
+                      <td>${d.resgateAnualNominal > 0 ? fmtB(d.resgateAnualNominal) : "—"}</td>
+                      <td>${d.resgateNominalMensal > 0 ? fmtB(d.resgateNominalMensal) : "—"}</td>
+                    </tr>`).join("");
+
+                  const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+                  <title>Relatório - ${nomeCliente || "Cliente"}</title>
+                  <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+                    *{box-sizing:border-box;margin:0;padding:0}
+                    body{background:#0f172a;color:#f8fafc;font-family:'Inter',sans-serif;padding:40px;font-size:13px}
+                    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:24px;border-bottom:1px solid rgba(255,255,255,0.1)}
+                    .header-left h1{font-size:26px;font-weight:700;letter-spacing:-0.02em;color:#f8fafc}
+                    .header-left p{font-size:13px;color:#94a3b8;margin-top:4px}
+                    .header-right{text-align:right}
+                    .header-right .nome{font-size:18px;font-weight:700;color:#f8fafc}
+                    .header-right .consultoria{font-size:12px;color:#94a3b8;margin-top:2px}
+                    .header-right .data{font-size:11px;color:#64748b;margin-top:6px}
+                    .cliente-box{background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:16px 20px;margin-bottom:32px;display:flex;justify-content:space-between;align-items:center}
+                    .cliente-box .label{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em}
+                    .cliente-box .value{font-size:18px;font-weight:700;color:#f8fafc;margin-top:4px}
+                    .meta-badge{padding:8px 20px;border-radius:999px;font-size:14px;font-weight:700;color:${metaCor};background:${metaCor}22;border:1px solid ${metaCor}55}
+                    .section-title{font-size:11px;color:#6366f1;text-transform:uppercase;letter-spacing:0.12em;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+                    .section-title::before{content:"";display:inline-block;width:3px;height:12px;background:#6366f1;border-radius:2px}
+                    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+                    .card{background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px}
+                    .card .lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px}
+                    .card .val{font-size:18px;font-weight:600;font-family:'JetBrains Mono',monospace;letter-spacing:-0.02em}
+                    .card .sub{font-size:10px;color:#64748b;margin-top:6px}
+                    .params-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:32px}
+                    .param{background:#1e293b;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center}
+                    .param .plbl{font-size:11px;color:#94a3b8}
+                    .param .pval{font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;color:#f8fafc}
+                    .resumo-box{background:rgba(99,102,241,0.08);border-left:3px solid #6366f1;border-radius:0 12px 12px 0;padding:20px 24px;margin-bottom:32px;font-size:14px;color:#cbd5e1;line-height:1.9}
+                    .resumo-box b{color:#f8fafc;font-family:'JetBrains Mono',monospace}
+                    .resumo-box .ok{color:#10b981;font-weight:700;font-family:'JetBrains Mono',monospace}
+                    .resumo-box .warn{color:#f43f5e;font-weight:700;font-family:'JetBrains Mono',monospace}
+                    .resumo-box .amber{color:#f59e0b;font-weight:700;font-family:'JetBrains Mono',monospace}
+                    table{width:100%;border-collapse:collapse;font-size:11px}
+                    th{padding:9px 12px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.1);font-size:10px;color:#94a3b8;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;background:#1e293b}
+                    td{padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.04);font-family:'JetBrains Mono',monospace}
+                    td:nth-child(n+4){text-align:right}
+                    .table-wrap{border:1px solid rgba(255,255,255,0.1);border-radius:12px;overflow:hidden;margin-bottom:32px}
+                    .footer{text-align:center;font-size:11px;color:#475569;padding-top:24px;border-top:1px solid rgba(255,255,255,0.06);margin-top:16px}
+                    @media print{body{padding:20px}}
+                  </style></head><body>
+
+                  <div class="header">
+                    <div class="header-left">
+                      <h1>Planejamento Financeiro</h1>
+                      <p>Simulação Patrimonial Personalizada</p>
+                    </div>
+                    <div class="header-right">
+                      <div class="nome">Geraldo Búrigo</div>
+                      <div class="consultoria">Consultoria Financeira</div>
+                      <div class="data">${hoje}</div>
+                    </div>
+                  </div>
+
+                  <div class="cliente-box">
+                    <div>
+                      <div class="label">Relatório preparado para</div>
+                      <div class="value">${nomeCliente || "—"}</div>
+                    </div>
+                    <div class="meta-badge">${metaStr}</div>
+                  </div>
+
+                  <div class="section-title">Resumo Executivo</div>
+                  <div class="resumo-box">
+                    ${anosCasoAtual
+                      ? `Aos <b>${Math.round(p.idadeAtual + anosCasoAtual)} anos</b> você atingirá a independência financeira — em aproximadamente <b>${anosCasoAtual.toFixed(1).replace(".",",")} anos</b>.`
+                      : `A meta <span class="warn">não é atingida</span> dentro de 80 anos — considere aumentar o aporte.`}
+                    Ao se aposentar aos <b>${p.idadeAposentadoria} anos</b>, após <b>${p.prazoAcumulacao} anos</b> de acumulação,
+                    seu patrimônio real será de <b>${fmtC(resumo.patrimonioAcumuladoReal)}</b>,
+                    ${resumo.patrimonioAcumuladoReal >= patrimonioNecessarioReal
+                      ? `<span class="ok">superando</span> o necessário de <span class="ok">${fmtC(patrimonioNecessarioReal)}</span>.`
+                      : `<span class="warn">abaixo</span> do necessário de <span class="warn">${fmtC(patrimonioNecessarioReal)}</span>.`}
+                    A renda mensal projetada é de <span class="ok">${fmtB(resumo.rendaMensalRealInicial)}</span> em poder de compra de hoje
+                    ${resumo.rendaMensalRealInicial >= p.rendaMensalDesejada
+                      ? `, <span class="ok">superando</span> a meta de <span class="ok">${fmtB(p.rendaMensalDesejada)}</span>.`
+                      : `, <span class="warn">abaixo</span> da meta de <span class="warn">${fmtB(p.rendaMensalDesejada)}</span>.`}
+                    ${resumo.anoEsgotamento
+                      ? `<span class="warn">⚠ Atenção: o patrimônio se esgota no ano ${resumo.anoEsgotamento}.</span>`
+                      : `O patrimônio sustenta os <b>${p.prazoUsufruto} anos</b> de usufruto planejados.`}
+                  </div>
+
+                  <div class="section-title">Resultados Projetados</div>
+                  <div class="cards">
+                    <div class="card"><div class="lbl">Patrimônio Nominal</div><div class="val" style="color:#f59e0b">${fmtC(resumo.patrimonioAcumuladoNominal)}</div><div class="sub">Valor futuro nominal</div></div>
+                    <div class="card"><div class="lbl">Patrimônio Real</div><div class="val" style="color:#6366f1">${fmtC(resumo.patrimonioAcumuladoReal)}</div><div class="sub">Poder de compra hoje</div></div>
+                    <div class="card"><div class="lbl">Renda Mensal Nominal</div><div class="val" style="color:#f59e0b">${fmtC(resumo.rendaMensalNominalInicial)}</div><div class="sub">Valor futuro nominal</div></div>
+                    <div class="card"><div class="lbl">Renda Mensal Real</div><div class="val" style="color:#10b981">${fmtC(resumo.rendaMensalRealInicial)}</div><div class="sub">Poder de compra hoje</div></div>
+                    <div class="card"><div class="lbl">Patrimônio Necessário Real</div><div class="val" style="color:${metaCor}">${fmtC(patrimonioNecessarioReal)}</div><div class="sub">${resumo.patrimonioAcumuladoReal >= patrimonioNecessarioReal ? "✓ Meta atingida" : "✗ Meta não atingida"}</div></div>
+                    <div class="card"><div class="lbl">Aporte Necessário</div><div class="val" style="color:#94a3b8">${aporteNecessario ? fmtC(aporteNecessario) : "—"}</div><div class="sub">Mensal para atingir a meta</div></div>
+                    <div class="card"><div class="lbl">Tempo para Meta</div><div class="val" style="color:#e2e8f0">${anosCasoAtual ? anosCasoAtual.toFixed(1).replace(".",",") + " anos" : "Não atinge"}</div><div class="sub">${anosCasoAtual ? "Aos " + Math.round(p.idadeAtual + anosCasoAtual) + " anos de idade" : ""}</div></div>
+                    <div class="card"><div class="lbl">Total Investido</div><div class="val" style="color:#10b981">${fmtC(resumo.totalInvestido)}</div><div class="sub">Capital aportado nominal</div></div>
+                  </div>
+
+                  <div class="section-title">Parâmetros da Simulação</div>
+                  <div class="params-grid">
+                    <div class="param"><span class="plbl">Idade Atual</span><span class="pval">${p.idadeAtual} anos</span></div>
+                    <div class="param"><span class="plbl">Idade de Aposentadoria</span><span class="pval">${p.idadeAposentadoria} anos</span></div>
+                    <div class="param"><span class="plbl">Prazo de Acumulação</span><span class="pval">${p.prazoAcumulacao} anos</span></div>
+                    <div class="param"><span class="plbl">Prazo de Usufruto</span><span class="pval">${p.prazoUsufruto} anos</span></div>
+                    <div class="param"><span class="plbl">Patrimônio Inicial</span><span class="pval">${fmtC(p.patrimonioInicial)}</span></div>
+                    <div class="param"><span class="plbl">Aporte Mensal</span><span class="pval">${fmtC(p.aporteMensal)}</span></div>
+                    <div class="param"><span class="plbl">Retorno Nominal (Acumulação)</span><span class="pval">${(p.retornoNominalAcumulacao * 100).toFixed(1).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Retorno Real (Acumulação)</span><span class="pval" style="color:#10b981">${retRealAcc >= 0 ? "+" : ""}${retRealAcc.toFixed(2).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Retorno Nominal (Usufruto)</span><span class="pval">${(p.retornoNominalUsufruto * 100).toFixed(1).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Retorno Real (Usufruto)</span><span class="pval" style="color:#10b981">${retRealUsu >= 0 ? "+" : ""}${retRealUsu.toFixed(2).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Inflação</span><span class="pval">${(p.inflacao * 100).toFixed(1).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Taxa de Retirada Anual</span><span class="pval">${(p.taxaRetiradaAnual * 100).toFixed(1).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Crescimento do Aporte</span><span class="pval">${(p.crescimentoAporteAnual * 100).toFixed(1).replace(".",",")}%</span></div>
+                    <div class="param"><span class="plbl">Renda Mensal Desejada</span><span class="pval">${fmtC(p.rendaMensalDesejada)}</span></div>
+                    <div class="param"><span class="plbl">Modo de Usufruto</span><span class="pval">${p.modoUsufruto === "fixa" ? "Renda Fixa Real" : "Retirada Percentual"}</span></div>
+                  </div>
+
+                  <div class="section-title">Evolução Patrimonial — Fluxo Anual</div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead><tr>
+                        <th>Ano</th><th>Idade</th><th>Fase</th>
+                        <th>Patrimônio Nominal</th><th>Patrimônio Real</th>
+                        <th>Aporte Anual</th><th>Resgate Anual</th><th>Resgate Mensal</th>
+                      </tr></thead>
+                      <tbody>${tabelaRows}</tbody>
+                    </table>
+                    ${dados.length > 40 ? `<div style="text-align:center;padding:10px;font-size:11px;color:#64748b">Exibindo os primeiros 40 anos de ${dados.length - 1} anos totais</div>` : ""}
+                  </div>
+
+                  <div class="footer">
+                    Relatório gerado por Geraldo Búrigo · Consultoria Financeira · ${hoje}<br>
+                    Este documento é de caráter informativo e não constitui recomendação de investimento.
+                  </div>
+                  </body></html>`;
+
+                  const win = window.open("", "_blank");
+                  win.document.write(html);
+                  win.document.close();
+                  setTimeout(() => win.print(), 800);
+                  setGerandoPdf(false);
+                  setModalPdf(false);
+                }}
+                disabled={gerandoPdf}
+                style={{ flex: 2, padding: "10px", borderRadius: 10, border: "none", background: gerandoPdf ? C.slate2 : `linear-gradient(135deg, ${C.emerald}, #0d9488)`, color: "#fff", fontSize: 13, cursor: gerandoPdf ? "not-allowed" : "pointer", fontFamily: C.sans, fontWeight: 600 }}>
+                {gerandoPdf ? "Gerando..." : "📄 Gerar PDF"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
