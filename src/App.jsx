@@ -230,14 +230,14 @@ export default function App() {
 
   const anosCasoAtual = useMemo(() => calcularTempoParaMeta({ patrimonioInicial: p.patrimonioInicial, aporteMensal: p.aporteMensal, crescimentoAporteAnual: p.crescimentoAporteAnual, retornoNominalAcumulacao: p.retornoNominalAcumulacao, inflacao: p.inflacao, taxaRetiradaAnual: p.taxaRetiradaAnual, rendaMensalDesejada: p.rendaMensalDesejada }), [p]);
 
-  const faixaRenda = useMemo(() => { const mil = Math.max(1, Math.round(p.rendaMensalDesejada/1000)); const inicio = Math.max(1, mil-10); return { inicio, fim: Math.max(inicio+20, mil+10) }; }, [p.rendaMensalDesejada]);
-  const sensibilidadeRenda = useMemo(() => { const arr = []; for (let r = faixaRenda.inicio; r <= faixaRenda.fim; r++) { const anos = calcularTempoParaMeta({ ...p, rendaMensalDesejada: r*1000 }); if (anos !== null) arr.push({ rendaMil: r, anos }); } return arr; }, [p, faixaRenda]);
+  const faixaRenda = useMemo(() => { if (modoApp !== "acumulacao") return { inicio: 1, fim: 2 }; const mil = Math.max(1, Math.round(p.rendaMensalDesejada/1000)); const inicio = Math.max(1, mil-10); return { inicio, fim: Math.max(inicio+20, mil+10) }; }, [p.rendaMensalDesejada, modoApp]);
+  const sensibilidadeRenda = useMemo(() => { if (modoApp !== "acumulacao") return []; const arr = []; for (let r = faixaRenda.inicio; r <= faixaRenda.fim; r++) { const anos = calcularTempoParaMeta({ ...p, rendaMensalDesejada: r*1000 }); if (anos !== null) arr.push({ rendaMil: r, anos }); } return arr; }, [p, faixaRenda, modoApp]);
 
-  const faixaAporte = useMemo(() => { const mil = Math.max(0, Math.round(p.aporteMensal/1000)); const inicio = Math.max(0, mil-15); return { inicio, fim: Math.max(inicio+25, mil+15) }; }, [p.aporteMensal]);
-  const sensibilidadeAporte = useMemo(() => { const arr = []; for (let a = faixaAporte.inicio; a <= faixaAporte.fim; a++) { const anos = calcularTempoParaMeta({ ...p, aporteMensal: a*1000 }); if (anos !== null) arr.push({ aporteMil: a, anos }); } return arr; }, [p, faixaAporte]);
+  const faixaAporte = useMemo(() => { if (modoApp !== "acumulacao") return { inicio: 0, fim: 1 }; const mil = Math.max(0, Math.round(p.aporteMensal/1000)); const inicio = Math.max(0, mil-15); return { inicio, fim: Math.max(inicio+25, mil+15) }; }, [p.aporteMensal, modoApp]);
+  const sensibilidadeAporte = useMemo(() => { if (modoApp !== "acumulacao") return []; const arr = []; for (let a = faixaAporte.inicio; a <= faixaAporte.fim; a++) { const anos = calcularTempoParaMeta({ ...p, aporteMensal: a*1000 }); if (anos !== null) arr.push({ aporteMil: a, anos }); } return arr; }, [p, faixaAporte, modoApp]);
 
-  const faixaPat = useMemo(() => { const mil = Math.max(100, Math.round(p.patrimonioInicial/1000)); const passo = 100; const inicio = Math.max(passo, mil-passo*8); return { inicio, fim: Math.max(inicio+passo*16, mil+passo*8), passo }; }, [p.patrimonioInicial]);
-  const sensibilidadePat = useMemo(() => { const arr = []; for (let pt = faixaPat.inicio; pt <= faixaPat.fim; pt += faixaPat.passo) { const anos = calcularTempoParaMeta({ ...p, patrimonioInicial: pt*1000 }); if (anos !== null) arr.push({ patrimonioMil: pt, anos }); } return arr; }, [p, faixaPat]);
+  const faixaPat = useMemo(() => { if (modoApp !== "acumulacao") return { inicio: 100, fim: 200, passo: 100 }; const mil = Math.max(100, Math.round(p.patrimonioInicial/1000)); const passo = 100; const inicio = Math.max(passo, mil-passo*8); return { inicio, fim: Math.max(inicio+passo*16, mil+passo*8), passo }; }, [p.patrimonioInicial, modoApp]);
+  const sensibilidadePat = useMemo(() => { if (modoApp !== "acumulacao") return []; const arr = []; for (let pt = faixaPat.inicio; pt <= faixaPat.fim; pt += faixaPat.passo) { const anos = calcularTempoParaMeta({ ...p, patrimonioInicial: pt*1000 }); if (anos !== null) arr.push({ patrimonioMil: pt, anos }); } return arr; }, [p, faixaPat, modoApp]);
 
   const resumoDados = useMemo(() => {
     const prazo = anosCasoAtual;
@@ -263,30 +263,34 @@ export default function App() {
     };
   }, [p, resumo, anosCasoAtual, dados, patrimonioNecessarioReal, patrimonioNecessarioNominal]);
 
-  // ── MODO USUFRUTO PURO — 3 cenários ─────────────────────────────────────
+  // ── MODO USUFRUTO PURO ─────────────────────────────────────────────────
   const cenariosUsufruto = useMemo(() => {
     const pat0      = limparMoeda(pu.patrimonio);
     const retNom    = (parseFloat(pu.retornoNominal) || 0) / 100;
     const infl      = (parseFloat(pu.inflacao) || 0) / 100;
-    const prazo     = parseInt(pu.prazo) || 30;
+    const prazo     = Math.min(parseInt(pu.prazo) || 30, 60); // limita a 60 anos
     const taxaAnual = (parseFloat(pu.taxaRetirada) || 4) / 100;
     const modo      = pu.modoUsufruto || "fixa";
     const txMesNom  = Math.pow(1 + retNom, 1/12) - 1;
     const txInflMes = Math.pow(1 + infl, 1/12) - 1;
-    const txRealMes = (1 + txMesNom) / (1 + txInflMes) - 1;
     const meses     = prazo * 12;
 
-    // Renda mensal real inicial com base na taxa de retirada
     const rendaMensalReal = pat0 * taxaAnual / 12;
 
-    // Simula evolução: nominal e real, retirada nominal e real
     const simular = () => {
       const pts = [{ ano: 0, patNominal: pat0, patReal: pat0, retirNominal: 0, retirReal: 0, retirNomMensal: 0, retirRealMensal: 0 }];
       let patNominal = pat0, fatorInfl = 1, rendaReal = rendaMensalReal;
       let retirAcumNom = 0, retirAcumReal = 0;
+      let anoEsgotamento = null;
 
       for (let mes = 1; mes <= meses; mes++) {
-        if (patNominal <= 0) { fatorInfl *= 1 + txInflMes; if (mes % 12 === 0) pts.push({ ano: mes/12, patNominal: 0, patReal: 0, retirNominal: 0, retirReal: 0, retirNomMensal: 0, retirRealMensal: 0 }); continue; }
+        // Se já zerou, apenas empurra zeros sem calcular
+        if (patNominal <= 0) {
+          fatorInfl *= 1 + txInflMes;
+          if (mes % 12 === 0) pts.push({ ano: mes/12, patNominal: 0, patReal: 0, retirNominal: 0, retirReal: 0, retirNomMensal: 0, retirRealMensal: 0 });
+          continue;
+        }
+
         const rendimento = patNominal * txMesNom;
         let retiradaNom;
         if (modo === "fixa") {
@@ -296,31 +300,29 @@ export default function App() {
           rendaReal = retiradaNom / fatorInfl;
         }
         patNominal = patNominal + rendimento - retiradaNom;
-        if (patNominal < 0) patNominal = 0;
+
+        if (patNominal <= 0) {
+          patNominal = 0;
+          if (!anoEsgotamento) anoEsgotamento = Math.ceil(mes / 12);
+        }
+
         fatorInfl *= 1 + txInflMes;
         const patReal = patNominal / fatorInfl;
         retirAcumNom  += retiradaNom;
         retirAcumReal += retiradaNom / fatorInfl;
 
         if (mes % 12 === 0) {
-          pts.push({
-            ano: mes/12,
-            patNominal, patReal,
-            retirNominal: retirAcumNom, retirReal: retirAcumReal,
-            retirNomMensal: retirAcumNom / 12, retirRealMensal: retirAcumReal / 12,
-          });
+          pts.push({ ano: mes/12, patNominal, patReal, retirNominal: retirAcumNom, retirReal: retirAcumReal, retirNomMensal: retirAcumNom / 12, retirRealMensal: retirAcumReal / 12 });
           retirAcumNom = 0; retirAcumReal = 0;
         }
       }
-      return pts;
+      return { pts, anoEsgotamento };
     };
 
-    const pontos = simular();
+    const { pts: pontos, anoEsgotamento } = simular();
     const ultimo = pontos[pontos.length - 1];
-    const retNominalPct = (retNom * 100).toFixed(1).replace(".",",");
-    const retRealPct = (((1 + retNom) / (1 + infl) - 1) * 100).toFixed(2).replace(".",",");
 
-    return { pat0, prazo, rendaMensalReal, pontos, ultimo, retNominalPct, retRealPct, taxaAnual };
+    return { pat0, prazo, rendaMensalReal, pontos, ultimo, taxaAnual, anoEsgotamento };
   }, [pu]);
 
   const setP = (campo, valor) => setParametros(prev => ({ ...prev, [campo]: valor }));
@@ -407,7 +409,7 @@ export default function App() {
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, fontFamily: C.sans, color: C.white }}>
+    <div style={{ height: "100vh", overflow: "hidden", background: C.bg, fontFamily: C.sans, color: C.white }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
         input[type=range]::-webkit-slider-thumb { background: ${C.indigo}; }
@@ -417,10 +419,10 @@ export default function App() {
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       `}</style>
 
-      <div style={{ display: "grid", gridTemplateColumns: "300px minmax(0,1fr)", minHeight: "100vh" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "300px minmax(0,1fr)", height: "100vh", overflow: "hidden" }}>
 
         {/* ── SIDEBAR ── */}
-        <aside style={{ background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column" }}>
+        <aside style={{ background: C.surface, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
           <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
               <div style={{ width: 32, height: 32, borderRadius: 10, background: `linear-gradient(135deg, ${C.indigo}, #8b5cf6)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>📊</div>
@@ -826,7 +828,7 @@ export default function App() {
 
           {/* ── MODO USUFRUTO PURO ── */}
           {modoApp === "usufruto" && (() => {
-            const { pat0, prazo, rendaMensalReal, pontos, ultimo } = cenariosUsufruto;
+            const { pat0, prazo, rendaMensalReal, pontos, ultimo, anoEsgotamento } = cenariosUsufruto;
             const idadeAtual = parseInt(pu.idadeAtual || 60);
             const herancaNominal = ultimo?.patNominal ?? 0;
             const herancaReal    = ultimo?.patReal    ?? 0;
@@ -835,12 +837,17 @@ export default function App() {
             return (
               <div>
                 {/* Banner de modo */}
-                <GlassCard style={{ marginBottom: 20, borderLeft: `3px solid ${C.emerald}`, borderRadius: "0 16px 16px 0" }}>
+                <GlassCard style={{ marginBottom: 20, borderLeft: `3px solid ${anoEsgotamento ? C.rose : C.emerald}`, borderRadius: "0 16px 16px 0" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
-                      <div style={{ fontSize: 14, color: C.emerald, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: 4 }}>🌅 Simulador de Renda Sustentável</div>
+                      <div style={{ fontSize: 14, color: anoEsgotamento ? C.rose : C.emerald, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: 4 }}>
+                        {anoEsgotamento ? "⚠️ Patrimônio se esgota" : "🌅 Simulador de Renda Sustentável"}
+                      </div>
                       <div style={{ fontSize: 13, color: C.slate }}>
-                        Patrimônio de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{fmtCpct(pat0)}</span> · Prazo de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{prazo} anos</span> · Taxa de retirada de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{pu.taxaRetirada || "4"}% a.a.</span>
+                        Patrimônio de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{fmtCpct(pat0)}</span>
+                        {" · "}Prazo de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{prazo} anos</span>
+                        {" · "}Taxa de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{pu.taxaRetirada || "4"}% a.a.</span>
+                        {anoEsgotamento && <span style={{ color: C.rose, fontWeight: 600 }}> · Esgota no ano {anoEsgotamento} (aos {parseInt(pu.idadeAtual||60) + anoEsgotamento} anos)</span>}
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
@@ -910,6 +917,10 @@ export default function App() {
                           stroke={modoGraficosUsu === "nominal" ? C.amber : C.indigo} strokeWidth={2}
                           fill="url(#gradUsu)" dot={false}
                           activeDot={{ r: 4, fill: modoGraficosUsu === "nominal" ? C.amber : C.indigo }} />
+                        {anoEsgotamento && (
+                          <ReferenceLine x={anoEsgotamento} stroke={C.rose} strokeDasharray="4 4"
+                            label={{ value: "Esgotamento", position: "insideTopRight", fill: C.rose, fontSize: 10 }} />
+                        )}
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
