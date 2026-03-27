@@ -119,12 +119,14 @@ export default function App() {
   const [tooltipAtivo, setTooltipAtivo] = useState(null);
   const [modoTabela, setModoTabela] = useState("nominal");
   const [modoGraficos, setModoGraficos] = useState("nominal");
+  const [modoGraficosUsu, setModoGraficosUsu] = useState("nominal");
   const [inputFoco, setInputFoco] = useState({});
   const [inputTemp, setInputTemp] = useState({});
   const [modalPdf, setModalPdf] = useState(false);
   const [nomeCliente, setNomeCliente] = useState("");
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const sidebarRef = useRef(null);
+  const mainRef = useRef(null);
   const relatorioRef = useRef(null);
 
   // Parâmetros do modo usufruto puro
@@ -427,7 +429,7 @@ export default function App() {
             {/* Toggle modo */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, background: C.bg, borderRadius: 10, padding: 3 }}>
               {[["acumulacao", "📈", "Acumulação"], ["usufruto", "🌅", "Só Usufruto"]].map(([modo, icon, label]) => (
-                <button key={modo} onClick={() => setModoApp(modo)}
+                <button key={modo} onClick={() => { setModoApp(modo); setTimeout(() => { if (mainRef.current) mainRef.current.scrollTop = 0; }, 50); }}
                   style={{ padding: "8px 4px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 11, fontFamily: C.sans, fontWeight: 600, transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                     background: modoApp === modo ? (modo === "acumulacao" ? C.indigo : C.emerald) : "transparent",
                     color: modoApp === modo ? "#fff" : C.slate }}>
@@ -574,8 +576,9 @@ export default function App() {
           )}
 
           {/* ── SIDEBAR ACUMULAÇÃO (original) ── */}
-          {modoApp === "acumulacao" && (<>
-
+          {modoApp === "acumulacao" && (
+            <div>
+            <div style={{ marginBottom: 8, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
               <button onClick={() => setAccOpen(!accOpen)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", background: accOpen ? C.surface2 : "transparent", border: "none", cursor: "pointer", color: C.white2, fontFamily: C.sans, fontSize: 13, fontWeight: 500 }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 8 }}><span>📈</span>Fase de Acumulação</span>
                 <span style={{ color: C.slate, fontSize: 10, transform: accOpen ? "rotate(180deg)" : "none" }}>▼</span>
@@ -777,7 +780,8 @@ export default function App() {
                 </div>
               )}
             </div>
-          </> /* fim modoApp === acumulacao na sidebar */}
+            </div>
+          )}{/* fim modoApp === acumulacao na sidebar */}
           </div>
 
           <div style={{ padding: "14px", borderTop: `1px solid ${C.border}` }}>
@@ -797,7 +801,7 @@ export default function App() {
         </aside>
 
         {/* ── MAIN ── */}
-        <main style={{ padding: "24px", overflowY: "auto" }}>
+        <main ref={mainRef} style={{ padding: "24px", overflowY: "auto", height: "100vh" }}>
 
           {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -822,14 +826,34 @@ export default function App() {
 
           {/* ── MODO USUFRUTO PURO ── */}
           {modoApp === "usufruto" && (() => {
-            const { pat0, prazo, rendaMensalReal, pontos, ultimo, retNominalPct, retRealPct, taxaAnual } = cenariosUsufruto;
+            const { pat0, prazo, rendaMensalReal, pontos, ultimo } = cenariosUsufruto;
             const idadeAtual = parseInt(pu.idadeAtual || 60);
             const herancaNominal = ultimo?.patNominal ?? 0;
             const herancaReal    = ultimo?.patReal    ?? 0;
-            const rendaMensalNominal = pontos[1]?.retirNomMensal ?? 0;
+            const rendaMensalNominal = pontos.length > 1 ? (pontos[1]?.retirNomMensal ?? 0) : 0;
 
             return (
               <div>
+                {/* Banner de modo */}
+                <GlassCard style={{ marginBottom: 20, borderLeft: `3px solid ${C.emerald}`, borderRadius: "0 16px 16px 0" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 14, color: C.emerald, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: 4 }}>🌅 Simulador de Renda Sustentável</div>
+                      <div style={{ fontSize: 13, color: C.slate }}>
+                        Patrimônio de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{fmtCpct(pat0)}</span> · Prazo de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{prazo} anos</span> · Taxa de retirada de <span style={{ color: C.white, fontFamily: C.mono, fontWeight: 600 }}>{pu.taxaRetirada || "4"}% a.a.</span>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 10, color: C.slate, marginBottom: 2 }}>Retorno real</div>
+                      {(() => {
+                        const rn = parseFloat(pu.retornoNominal||0); const inf = parseFloat(pu.inflacao||0);
+                        const rr = ((1+rn/100)/(1+inf/100)-1)*100;
+                        return <div style={{ fontSize: 18, color: rr>=0?C.emerald:C.rose, fontFamily: C.mono, fontWeight: 700 }}>{rr>=0?"+":""}{rr.toFixed(2).replace(".",",")}%</div>;
+                      })()}
+                    </div>
+                  </div>
+                </GlassCard>
+
                 {/* Cards resultados */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
                   <MetricCard label="Herança · Patrimônio Nominal" value={fmtCpct(herancaNominal)} sub={`Fim do usufruto (${idadeAtual + prazo} anos)`} accent={C.amber} icon="🏦" />
@@ -838,91 +862,105 @@ export default function App() {
                   <MetricCard label="Renda Mensal Real" value={fmtCpct(rendaMensalReal)} sub="Poder de compra hoje" accent={C.emerald} icon="💰" />
                 </div>
 
-                {/* Gráfico patrimônio nominal e real */}
+                {/* Toggle Nominal / Real */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+                  <div style={{ display: "flex", gap: 0, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
+                    {["nominal", "real"].map(modo => (
+                      <button key={modo} onClick={() => setModoGraficosUsu(modo)}
+                        style={{ padding: "6px 20px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontFamily: C.sans, fontWeight: 500, transition: "all 0.2s",
+                          background: modoGraficosUsu === modo ? (modo === "nominal" ? C.amber : C.indigo) : "transparent",
+                          color: modoGraficosUsu === modo ? "#fff" : C.slate }}>
+                        {modo === "nominal" ? "Nominal" : "Ajustado pela inflação"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gráfico patrimônio */}
                 <GlassCard style={{ marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <SectionTitle>Evolução do Patrimônio ao Longo do Usufruto</SectionTitle>
-                    <div style={{ display: "flex", gap: 14 }}>
-                      {[[C.amber, "Nominal"], [C.indigo, "Real"]].map(([cor, lbl]) => (
-                        <span key={lbl} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.slate }}>
-                          <span style={{ width: 14, height: 3, background: cor, borderRadius: 2, display: "inline-block" }} />{lbl}
-                        </span>
-                      ))}
-                    </div>
+                    <span style={{ fontSize: 11, color: modoGraficosUsu === "nominal" ? C.amber : C.indigo, padding: "3px 10px", borderRadius: 999, border: `1px solid ${modoGraficosUsu === "nominal" ? C.amber : C.indigo}`, opacity: 0.8 }}>
+                      {modoGraficosUsu === "nominal" ? "valores nominais" : "poder de compra de hoje"}
+                    </span>
                   </div>
                   <div style={{ height: 300 }}>
                     <ResponsiveContainer>
-                      <LineChart data={pontos} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <AreaChart data={pontos} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="gradUsu" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={modoGraficosUsu === "nominal" ? C.amber : C.indigo} stopOpacity={0.2} />
+                            <stop offset="100%" stopColor={modoGraficosUsu === "nominal" ? C.amber : C.indigo} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid {...chartProps.cartesianGrid} />
                         <XAxis dataKey="ano" {...chartProps.xAxis} />
                         <YAxis tickFormatter={v => `${(v/1e6).toFixed(1)}Mi`} {...chartProps.yAxis} />
                         <Tooltip content={({ active, payload, label }) => {
                           if (!active || !payload?.length) return null;
+                          const val = modoGraficosUsu === "nominal" ? payload[0]?.payload?.patNominal : payload[0]?.payload?.patReal;
                           return (
                             <div style={{ ...chartProps.tooltip.contentStyle, padding: "12px 16px" }}>
                               <div style={{ fontSize: 11, color: C.slate, marginBottom: 8 }}>Ano {label} · {idadeAtual + label} anos</div>
-                              {payload.map(s => (
-                                <div key={s.name} style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
-                                  <span style={{ fontSize:11, color: s.color }}>{s.name}</span>
-                                  <span style={{ fontSize:12, color: s.color, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(s.value)}</span>
-                                </div>
-                              ))}
+                              <div style={{ color: modoGraficosUsu === "nominal" ? C.amber : C.indigo, fontFamily: C.mono, fontWeight: 600 }}>Patrimônio: {fmtBRL(val)}</div>
                             </div>
                           );
                         }} />
-                        <Line type="monotone" dataKey="patNominal" name="Nominal" stroke={C.amber} strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.amber }} />
-                        <Line type="monotone" dataKey="patReal"    name="Real"    stroke={C.indigo} strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.indigo }} />
-                      </LineChart>
+                        <Area type="monotone" dataKey={modoGraficosUsu === "nominal" ? "patNominal" : "patReal"}
+                          stroke={modoGraficosUsu === "nominal" ? C.amber : C.indigo} strokeWidth={2}
+                          fill="url(#gradUsu)" dot={false}
+                          activeDot={{ r: 4, fill: modoGraficosUsu === "nominal" ? C.amber : C.indigo }} />
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </GlassCard>
 
-                {/* Gráfico retiradas nominal e real */}
+                {/* Gráfico retiradas */}
                 <GlassCard style={{ marginBottom: 16 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                     <SectionTitle>Retirada Anual ao Longo do Usufruto</SectionTitle>
-                    <div style={{ display: "flex", gap: 14 }}>
-                      {[[C.amber, "Nominal"], [C.emerald, "Real"]].map(([cor, lbl]) => (
-                        <span key={lbl} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.slate }}>
-                          <span style={{ width: 14, height: 3, background: cor, borderRadius: 2, display: "inline-block" }} />{lbl}
-                        </span>
-                      ))}
-                    </div>
+                    <span style={{ fontSize: 11, color: modoGraficosUsu === "nominal" ? C.amber : C.emerald, padding: "3px 10px", borderRadius: 999, border: `1px solid ${modoGraficosUsu === "nominal" ? C.amber : C.emerald}`, opacity: 0.8 }}>
+                      {modoGraficosUsu === "nominal" ? "valores nominais" : "poder de compra de hoje"}
+                    </span>
                   </div>
                   <div style={{ height: 260 }}>
                     <ResponsiveContainer>
-                      <LineChart data={pontos.filter(d => d.ano > 0)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <AreaChart data={pontos.filter(d => d.ano > 0)} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="gradRetir" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={modoGraficosUsu === "nominal" ? C.amber : C.emerald} stopOpacity={0.2} />
+                            <stop offset="100%" stopColor={modoGraficosUsu === "nominal" ? C.amber : C.emerald} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
                         <CartesianGrid {...chartProps.cartesianGrid} />
                         <XAxis dataKey="ano" {...chartProps.xAxis} />
                         <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
                         <Tooltip content={({ active, payload, label }) => {
                           if (!active || !payload?.length) return null;
                           const d = payload[0]?.payload;
+                          const cor = modoGraficosUsu === "nominal" ? C.amber : C.emerald;
+                          const anual  = modoGraficosUsu === "nominal" ? d?.retirNominal    : d?.retirReal;
+                          const mensal = modoGraficosUsu === "nominal" ? d?.retirNomMensal  : d?.retirRealMensal;
                           return (
                             <div style={{ ...chartProps.tooltip.contentStyle, padding: "12px 16px" }}>
                               <div style={{ fontSize: 11, color: C.slate, marginBottom: 8 }}>Ano {label} · {idadeAtual + label} anos</div>
                               <div style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
-                                <span style={{ fontSize:11, color: C.amber }}>Retirada nominal anual</span>
-                                <span style={{ fontSize:12, color: C.amber, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirNominal)}</span>
-                              </div>
-                              <div style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
-                                <span style={{ fontSize:11, color: C.amber }}>Retirada nominal mensal</span>
-                                <span style={{ fontSize:12, color: C.amber, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirNomMensal)}</span>
-                              </div>
-                              <div style={{ display:"flex", justifyContent:"space-between", gap:16, marginBottom:4 }}>
-                                <span style={{ fontSize:11, color: C.emerald }}>Retirada real anual</span>
-                                <span style={{ fontSize:12, color: C.emerald, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirReal)}</span>
+                                <span style={{ fontSize:11, color: cor }}>Retirada anual</span>
+                                <span style={{ fontSize:12, color: cor, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(anual)}</span>
                               </div>
                               <div style={{ display:"flex", justifyContent:"space-between", gap:16 }}>
-                                <span style={{ fontSize:11, color: C.emerald }}>Retirada real mensal</span>
-                                <span style={{ fontSize:12, color: C.emerald, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(d?.retirRealMensal)}</span>
+                                <span style={{ fontSize:11, color: cor }}>Retirada mensal</span>
+                                <span style={{ fontSize:12, color: cor, fontFamily: C.mono, fontWeight:600 }}>{fmtBRL(mensal)}</span>
                               </div>
                             </div>
                           );
                         }} />
-                        <Line type="monotone" dataKey="retirNominal" name="Retirada Nominal" stroke={C.amber}   strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.amber }} />
-                        <Line type="monotone" dataKey="retirReal"    name="Retirada Real"    stroke={C.emerald} strokeWidth={2} dot={false} activeDot={{ r:4, fill: C.emerald }} />
-                      </LineChart>
+                        <Area type="monotone"
+                          dataKey={modoGraficosUsu === "nominal" ? "retirNominal" : "retirReal"}
+                          stroke={modoGraficosUsu === "nominal" ? C.amber : C.emerald} strokeWidth={2}
+                          fill="url(#gradRetir)" dot={false}
+                          activeDot={{ r: 4, fill: modoGraficosUsu === "nominal" ? C.amber : C.emerald }} />
+                      </AreaChart>
                     </ResponsiveContainer>
                   </div>
                 </GlassCard>
