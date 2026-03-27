@@ -808,30 +808,16 @@ export default function App() {
               <div style={{ fontSize: 13, color: C.slate, marginTop: 3 }}>Consultoria Financeira</div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {/* Toggle modo app */}
-              <div style={{ display: "flex", gap: 0, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
-                {[["acumulacao", "📈 Acumulação + Usufruto"], ["usufruto", "🌅 Só Usufruto"]].map(([modo, label]) => (
-                  <button key={modo} onClick={() => setModoApp(modo)}
-                    style={{ padding: "7px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontFamily: C.sans, fontWeight: 500, transition: "all 0.2s",
-                      background: modoApp === modo ? (modo === "acumulacao" ? C.indigo : C.emerald) : "transparent",
-                      color: modoApp === modo ? "#fff" : C.slate }}>
-                    {label}
+            {/* Abas — só no modo acumulação */}
+            {modoApp === "acumulacao" && (
+              <div style={{ display: "flex", gap: 6, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
+                {["graficos", "sensibilidade", "tabela"].map(aba => (
+                  <button key={aba} style={tabStyle(aba)} onClick={() => setAbaAtiva(aba)}>
+                    {aba === "graficos" ? "Visão Geral" : aba === "sensibilidade" ? "Sensibilidade" : "Tabela"}
                   </button>
                 ))}
               </div>
-
-              {/* Abas — só no modo acumulação */}
-              {modoApp === "acumulacao" && (
-                <div style={{ display: "flex", gap: 6, background: C.surface2, borderRadius: 10, padding: 3, border: `1px solid ${C.border}` }}>
-                  {["graficos", "sensibilidade", "tabela"].map(aba => (
-                    <button key={aba} style={tabStyle(aba)} onClick={() => setAbaAtiva(aba)}>
-                      {aba === "graficos" ? "Visão Geral" : aba === "sensibilidade" ? "Sensibilidade" : "Tabela"}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           {/* ── MODO USUFRUTO PURO ── */}
