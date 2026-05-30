@@ -896,4 +896,274 @@ export default function App() {
           {/* ── MODO ACUMULAÇÃO ── */}
           {modoApp === "acumulacao" && <>
 
-          {/* Resumo E
+
+          {/* Resumo Executivo */}
+          {(() => {
+            const { prazo, patReal, heranca, atingeMeta, fmtC, fmtB, rendaMensalReal, rendaMeta, patNecessarioReal, anoEsgot, prazoAcc, prazoUsu, idadeAtual, idadeAposentadoria, supereRenda } = resumoDados;
+            const D = ({ children, cor }) => <span style={{ color: cor, fontWeight: 700, fontFamily: C.mono }}>{children}</span>;
+            return (
+              <DarkCard style={{ marginBottom: 16, borderLeft: `3px solid ${C.accent}`, borderRadius: "0 10px 10px 0" }}>
+                <div style={{ fontSize: 10, color: C.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10, fontWeight: 600 }}>// resumo executivo</div>
+                <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.9 }}>
+                  {prazo
+                    ? <>Aos <D cor={C.text}>{Math.round(idadeAtual + prazo)} anos</D> você atingirá a independência financeira — em aproximadamente <D cor={C.text}>{prazo.toFixed(1).replace(".", ",")} anos</D>. </>
+                    : <>A meta <D cor={C.rose}>não é atingida</D> dentro de 80 anos — considere aumentar o aporte ou reduzir a renda desejada. </>
+                  }
+                  Ao se aposentar aos <D cor={C.text}>{idadeAposentadoria} anos</D>, após <D cor={C.text}>{prazoAcc} anos</D> de acumulação, seu patrimônio real será de{" "}
+                  <D cor={C.indigo}>{fmtC(patReal)}</D>,{" "}
+                  {atingeMeta
+                    ? <>superando o necessário de <D cor={C.emerald}>{fmtC(patNecessarioReal)}</D>. </>
+                    : <>abaixo do necessário de <D cor={C.rose}>{fmtC(patNecessarioReal)}</D>. </>
+                  }
+                  A renda mensal projetada é de <D cor={C.emerald}>{fmtB(rendaMensalReal)}</D> em poder de compra de hoje
+                  {supereRenda
+                    ? <>, superando sua meta de <D cor={C.emerald}>{fmtB(rendaMeta)}</D>. </>
+                    : <>, abaixo da sua meta de <D cor={C.rose}>{fmtB(rendaMeta)}</D>. </>
+                  }
+                  {anoEsgot
+                    ? <><D cor={C.rose}>Atenção:</D> o patrimônio se esgota no ano <D cor={C.rose}>{anoEsgot}</D>. Considere reduzir a taxa de retirada.</>
+                    : <>O patrimônio sustenta os <D cor={C.text}>{prazoUsu} anos</D> de usufruto{heranca > 0 ? <>, com herança projetada de <D cor={C.amber}>{fmtC(heranca)}</D>.</> : <>.</>}</>
+                  }
+                </div>
+              </DarkCard>
+            );
+          })()}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginBottom: 10 }}>
+            <MetricCard label="Patrimônio Nominal" value={fmtCpct(resumo.patrimonioAcumuladoNominal)} sub="Valor futuro nominal" accent={C.amber} />
+            <MetricCard label="Patrimônio Real" value={fmtCpct(resumo.patrimonioAcumuladoReal)} sub="Poder de compra hoje" accent={C.indigo} />
+            <MetricCard label="Renda Mensal Nominal" value={fmtCpct(resumo.rendaMensalNominalInicial)} sub="Valor futuro nominal" accent={C.amber} />
+            <MetricCard label="Renda Mensal Real" value={fmtCpct(resumo.rendaMensalRealInicial)} sub="Poder de compra hoje" accent={C.emerald} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 10, marginBottom: 20 }}>
+            <MetricCard label="Aporte Necessário" value={aporteNecessario ? fmtCpct(aporteNecessario) : "—"} sub={`Mensal · meta em ${p.prazoAcumulacao} anos`} accent={C.muted} />
+            <MetricCard label="Tempo para Meta" value={anosCasoAtual ? `${anosCasoAtual.toFixed(1).replace(".",",")} anos` : "Não atinge"} sub={anosCasoAtual ? `Aos ${Math.round(p.idadeAtual + anosCasoAtual)} anos` : "Ajuste os parâmetros"} accent={C.text} />
+            <MetricCard label="Patrimônio Necessário Nominal" value={fmtCpct(patrimonioNecessarioNominal)} sub={metaAtingida ? "✓ Meta atingida" : "✗ Meta não atingida"} accent={metaAtingida ? C.emerald : C.rose} subColor={metaAtingida ? C.emerald : C.rose} />
+            <MetricCard label="Patrimônio Necessário Real" value={fmtCpct(patrimonioNecessarioReal)} sub={metaAtingida ? "✓ Meta atingida" : "✗ Meta não atingida"} accent={metaAtingida ? C.emerald : C.rose} subColor={metaAtingida ? C.emerald : C.rose} />
+          </div>
+
+          {abaAtiva === "graficos" && (
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <div style={{ display: "flex", gap: 3, background: C.surface, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+                  {["nominal", "real"].map(modo => (
+                    <button key={modo} onClick={() => setModoGraficos(modo)} style={toggleStyle(modoGraficos === modo, modo === "nominal" ? C.amber : C.indigo)}>
+                      {modo === "nominal" ? "nominal" : "ajustado inflação"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <DarkCard>
+                <SectionTag>{modoGraficos === "nominal" ? "patrimônio nominal ao longo do tempo" : "patrimônio real ao longo do tempo"}</SectionTag>
+                <div style={{ height: 300 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={dados} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradP" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={modoGraficos === "nominal" ? C.amber : C.indigo} stopOpacity={0.25} />
+                          <stop offset="100%" stopColor={modoGraficos === "nominal" ? C.amber : C.indigo} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={fmtMi} {...chartProps.yAxis} />
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        const val = modoGraficos === "nominal" ? d.patrimonioNominal : d.patrimonioReal;
+                        return (
+                          <div style={{ ...chartProps.tooltip.contentStyle, padding: "10px 14px" }}>
+                            <div style={{ color: C.muted2, marginBottom: 6, fontSize: 10 }}>ano {d.ano} · {d.fase} · {p.idadeAtual + d.ano} anos</div>
+                            <div style={{ color: modoGraficos === "nominal" ? C.amber : C.indigo }}>patrimônio: {fmtBRL(val)}</div>
+                            {d.rendaMensalReal > 0 && <div style={{ color: C.emerald, marginTop: 3 }}>renda: {fmtBRL(d.rendaMensalReal)}</div>}
+                          </div>
+                        );
+                      }} />
+                      <ReferenceLine x={p.prazoAcumulacao} stroke={C.border2} strokeDasharray="4 4" label={{ value: `aposentadoria (${p.idadeAposentadoria}a)`, position: "insideTopRight", fill: C.muted2, fontSize: 10 }} />
+                      {pico && <ReferenceLine x={pico.ano} stroke={C.emerald} strokeDasharray="3 3" label={{ value: "pico", position: "insideTopLeft", fill: C.emerald, fontSize: 10 }} />}
+                      {resumo.anoEsgotamento && <ReferenceLine x={Math.floor(resumo.anoEsgotamento)} stroke={C.rose} strokeDasharray="3 3" label={{ value: "esgotamento", position: "insideTopRight", fill: C.rose, fontSize: 10 }} />}
+                      <Area type="monotone" dataKey={modoGraficos === "nominal" ? "patrimonioNominal" : "patrimonioReal"}
+                        stroke={modoGraficos === "nominal" ? C.amber : C.indigo} strokeWidth={2} fill="url(#gradP)" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </DarkCard>
+
+              <DarkCard>
+                <SectionTag>renda mensal no usufruto</SectionTag>
+                <div style={{ height: 200 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={dadosRendaMensal} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={modoGraficos === "nominal" ? C.amber : C.emerald} stopOpacity={0.25} />
+                          <stop offset="100%" stopColor={modoGraficos === "nominal" ? C.amber : C.emerald} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                      <Tooltip formatter={v => [fmtBRL(v), modoGraficos === "nominal" ? "Renda nominal" : "Renda real"]} {...chartProps.tooltip} itemStyle={{ color: C.text }} />
+                      {p.rendaMensalDesejada > 0 && <ReferenceLine y={p.rendaMensalDesejada} stroke={C.indigo} strokeDasharray="4 4" label={{ value: "meta", position: "insideTopRight", fill: C.indigo, fontSize: 10 }} />}
+                      <Area type="monotone" dataKey={modoGraficos === "nominal" ? "rendaMensalNominal" : "rendaMensalReal"}
+                        stroke={modoGraficos === "nominal" ? C.amber : C.emerald} strokeWidth={2} fill="url(#gradR)" dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </DarkCard>
+
+              <DarkCard>
+                <SectionTag>fluxos anuais</SectionTag>
+                <div style={{ height: 200 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={dadosFluxos} barCategoryGap="25%" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={v => `${Math.round(v/1000)}k`} {...chartProps.yAxis} />
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        const isAporte = d.fase === "Acumulação";
+                        const cor = isAporte ? C.emerald : C.rose;
+                        const val = modoGraficos === "nominal" ? d.fluxoNominal : d.fluxoReal;
+                        return (
+                          <div style={{ ...chartProps.tooltip.contentStyle, padding: "10px 14px" }}>
+                            <div style={{ fontSize: 10, color: C.muted2, marginBottom: 6 }}>ano {d.ano} · {p.idadeAtual + d.ano} anos</div>
+                            <div style={{ color: cor }}>{isAporte ? "aporte" : "retirada"}: <strong>{fmtBRL(val)}</strong></div>
+                            <div style={{ color: cor, marginTop: 2 }}>mensal: <strong>{fmtBRL(val/12)}</strong></div>
+                          </div>
+                        );
+                      }} />
+                      <ReferenceLine x={p.prazoAcumulacao} stroke={C.border2} strokeDasharray="3 3" />
+                      <Bar dataKey={modoGraficos === "nominal" ? "fluxoNominal" : "fluxoReal"} radius={[4,4,0,0]}>
+                        {dadosFluxos.map((e, i) => <Cell key={i} fill={e.cor} fillOpacity={0.8} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </DarkCard>
+
+              <DarkCard>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <SectionTag>total investido vs rendimento</SectionTag>
+                  <div style={{ display: "flex", gap: 14 }}>
+                    {[["total investido", C.emerald, resumo.totalInvestido], ["rendimento", C.indigo, resumo.rendimento]].map(([lbl, cor, val]) => (
+                      <div key={lbl} style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 10, color: C.muted2, display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                          <span style={{ width: 7, height: 7, borderRadius: 2, background: cor, display: "inline-block" }} />{lbl}
+                        </div>
+                        <div style={{ fontSize: 14, color: cor, fontFamily: C.mono, fontWeight: 500 }}>{fmtCpct(val)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ height: 200 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={dadosEmpilhado} barCategoryGap="20%" margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid {...chartProps.cartesianGrid} />
+                      <XAxis dataKey="ano" {...chartProps.xAxis} />
+                      <YAxis tickFormatter={v => `${v.toFixed(1)}Mi`} {...chartProps.yAxis} />
+                      <Tooltip formatter={(v, name) => [`R$ ${v.toFixed(2).replace(".",",")} mi`, name]} {...chartProps.tooltip} />
+                      <Bar dataKey="totalInvestido" name="Total Investido" stackId="a" fill={C.emerald} fillOpacity={0.75} radius={[0,0,0,0]} />
+                      <Bar dataKey="rendimento" name="Rendimento" stackId="a" fill={C.indigo} fillOpacity={0.85} radius={[4,4,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </DarkCard>
+            </div>
+          )}
+
+          {abaAtiva === "sensibilidade" && (
+            <div style={{ display: "grid", gap: 12 }}>
+              <SensChart title="sensibilidade · renda desejada" data={sensibilidadeRenda} xKey="rendaMil" xLabel="Renda mensal (mil R$)" lineColor={C.indigo} currentX={p.rendaMensalDesejada/1000} currentY={anosCasoAtual} tipPrefix="Renda" fmtX={l => `R$${l}k`} />
+              <SensChart title="sensibilidade · aporte mensal" data={sensibilidadeAporte} xKey="aporteMil" xLabel="Aporte mensal (mil R$)" lineColor={C.emerald} currentX={p.aporteMensal/1000} currentY={anosCasoAtual} tipPrefix="Aporte" fmtX={l => `R$${l}k`} />
+              <SensChart title="sensibilidade · patrimônio inicial" data={sensibilidadePat} xKey="patrimonioMil" xLabel="Patrimônio inicial (mil R$)" lineColor={C.amber} currentX={p.patrimonioInicial/1000} currentY={anosCasoAtual} tipPrefix="Patrimônio" fmtX={l => `R$${Number(l).toLocaleString("pt-BR")}k`} />
+            </div>
+          )}
+
+          {abaAtiva === "tabela" && (
+            <DarkCard>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <SectionTag>tabela da simulação</SectionTag>
+                <div style={{ display: "flex", gap: 3, background: C.bg, borderRadius: 8, padding: 3, border: `1px solid ${C.border}` }}>
+                  {["nominal", "real"].map(modo => (
+                    <button key={modo} onClick={() => setModoTabela(modo)} style={toggleStyle(modoTabela === modo)}>
+                      {modo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ overflowX: "auto", maxHeight: 520 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+                  <thead>
+                    <tr>
+                      {["Ano", "Idade", "Fase", "Patrimônio", "Aporte Anual", "Aporte Mensal", "Resgate Anual", "Resgate Mensal"].map(h => (
+                        <th key={h} style={{ padding: "8px 12px", textAlign: h === "Ano" || h === "Idade" || h === "Fase" ? "left" : "right", borderBottom: `1px solid ${C.border}`, fontSize: 10, color: C.muted2, fontWeight: 500, fontFamily: C.mono, textTransform: "uppercase", letterSpacing: "0.06em", position: "sticky", top: 0, background: C.surface, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dados.map((d, i) => {
+                      const isTransicao = d.ano === p.prazoAcumulacao;
+                      const bgBase = isTransicao ? C.accentBg : "transparent";
+                      const nom = modoTabela === "nominal";
+                      const patrimonio = nom ? d.patrimonioNominal : d.patrimonioReal;
+                      const aporteAnual = nom ? d.aporteAnualNominal : d.aporteAnualReal;
+                      const aporteMes = nom ? d.aporteMensalNominal : d.aporteMensalReal;
+                      const resgateAnu = nom ? d.resgateAnualNominal : d.resgateAnualReal;
+                      const resgatemMes = nom ? d.resgateNominalMensal : d.rendaMensalReal;
+                      const idade = p.idadeAtual + d.ano;
+                      return (
+                        <tr key={i} style={{ background: bgBase }}>
+                          <td style={{ padding: "8px 12px", fontSize: 11, color: C.muted2, fontFamily: C.mono, borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{d.ano}</td>
+                          <td style={{ padding: "8px 12px", fontSize: 11, color: C.text, fontFamily: C.mono, borderBottom: `1px solid rgba(255,255,255,0.03)` }}>{idade}</td>
+                          <td style={{ padding: "8px 12px", borderBottom: `1px solid rgba(255,255,255,0.03)`, whiteSpace: "nowrap" }}>
+                            <span style={{ padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 500, fontFamily: C.mono, background: d.fase === "Acumulação" ? "rgba(163,230,53,0.15)" : "rgba(74,222,128,0.15)", color: d.fase === "Acumulação" ? C.accent : C.emerald }}>{d.fase}</span>
+                          </td>
+                          {[patrimonio, aporteAnual, aporteMes, resgateAnu, resgatemMes].map((v, j) => (
+                            <td key={j} style={{ padding: "8px 12px", fontSize: 11, color: v > 0 ? C.text : C.muted2, fontFamily: C.mono, borderBottom: `1px solid rgba(255,255,255,0.03)`, textAlign: "right", whiteSpace: "nowrap" }}>
+                              {v > 0 ? fmtBRL(v) : <span style={{ color: C.border2 }}>—</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={exportarCSV} style={{ padding: "6px 14px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 11, cursor: "pointer", fontFamily: C.mono }}>
+                  ↓ exportar csv
+                </button>
+              </div>
+            </DarkCard>
+          )}
+          </>}
+        </main>
+      </div>
+
+      {modalPdf && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border2}`, borderRadius: 10, padding: 28, width: "100%", maxWidth: 440 }}>
+            <div style={{ fontSize: 11, color: C.muted2, letterSpacing: "0.05em", marginBottom: 6 }}>// gerar relatório pdf</div>
+            <h2 style={{ margin: "0 0 6px", fontSize: 17, fontWeight: 600, color: C.text, fontFamily: C.mono }}>Relatório Personalizado</h2>
+            <p style={{ margin: "0 0 20px", fontSize: 12, color: C.muted }}>Preencha o nome do cliente para personalizar o relatório.</p>
+            <label style={{ fontSize: 11, color: C.muted, display: "block", marginBottom: 5 }}>Nome do cliente</label>
+            <input type="text" placeholder="Ex: João Silva" value={nomeCliente} onChange={e => setNomeCliente(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px", background: C.surface2, border: `1px solid ${C.border2}`, borderRadius: 7, color: C.text, fontSize: 13, fontFamily: C.mono, outline: "none", boxSizing: "border-box", marginBottom: 20 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setModalPdf(false)}
+                style={{ flex: 1, padding: "9px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, fontSize: 12, cursor: "pointer", fontFamily: C.mono }}>
+                cancelar
+              </button>
+              <button onClick={() => { setModalPdf(false); }} style={{ flex: 2, padding: "9px", borderRadius: 7, border: "none", background: C.accentBg, borderWidth: 1, borderStyle: "solid", borderColor: C.accent, color: C.accent, fontSize: 12, cursor: "pointer", fontFamily: C.mono, fontWeight: 600 }}>
+                // gerar pdf
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
